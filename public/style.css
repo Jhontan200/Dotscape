@@ -1,0 +1,260 @@
+/* --- RESET Y BASE --- */
+* {
+    border: none;
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+    outline: none; /* Quitar borde azul de selección */
+}
+
+body {
+    margin: 0;
+    padding: 0;
+    overflow: hidden;
+    font-family: 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+    background-color: #111; /* Fondo un poco más oscuro */
+    color: white;
+}
+
+canvas {
+    display: block;
+    position: absolute;
+    top: 0;
+    left: 0;
+    z-index: 1;
+}
+
+/* --- ESTILOS DE CONTENEDORES (MENÚS) --- */
+/* Efecto Glassmorphism: Fondo oscuro semitransparente con desenfoque */
+#login-screen,
+#game-over-screen {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    
+    background: rgba(30, 30, 40, 0.85); /* Fondo oscuro translúcido */
+    backdrop-filter: blur(10px);        /* Efecto de borrosidad detrás */
+    border: 1px solid rgba(255, 255, 255, 0.1); /* Borde sutil */
+    
+    padding: 40px;
+    border-radius: 20px;
+    text-align: center;
+    box-shadow: 0 0 50px rgba(0, 0, 0, 0.8); /* Sombra grande para profundidad */
+    z-index: 10;
+    width: 350px; /* Un poco más ancho */
+    transition: all 0.3s ease;
+}
+
+/* Animación suave al aparecer */
+.hidden {
+    display: none !important;
+    opacity: 0;
+    pointer-events: none;
+}
+
+/* --- TIPOGRAFÍA --- */
+h1 {
+    margin-bottom: 10px;
+    color: #fff;
+    font-size: 32px;
+    font-weight: 800;
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    text-shadow: 0 0 10px rgba(76, 175, 80, 0.5); /* Resplandor verde */
+}
+
+h2 {
+    color: #ff4444;
+    font-size: 28px;
+    font-weight: 800;
+    margin-bottom: 15px;
+    text-shadow: 0 0 15px rgba(255, 68, 68, 0.6); /* Resplandor rojo */
+}
+
+p {
+    color: #bbb;
+    font-size: 14px;
+    margin-bottom: 20px;
+}
+
+.player-id {
+    font-size: 12px;
+    color: #888;
+    margin-bottom: 20px;
+    font-family: monospace;
+    background: rgba(0,0,0,0.3);
+    padding: 5px;
+    border-radius: 4px;
+    display: inline-block;
+}
+
+/* --- INPUTS (TEXTO Y SELECT) --- */
+input[type="text"],
+select,
+input[type="file"] {
+    background: rgba(255, 255, 255, 0.1);
+    color: white;
+    padding: 12px;
+    width: 100%;
+    margin-bottom: 15px;
+    border: 2px solid transparent;
+    border-radius: 8px;
+    font-size: 16px;
+    transition: all 0.3s;
+}
+
+/* Efecto al hacer clic en el input */
+input[type="text"]:focus,
+select:focus {
+    background: rgba(255, 255, 255, 0.15);
+    border-color: #4CAF50;
+    box-shadow: 0 0 10px rgba(76, 175, 80, 0.3);
+}
+
+/* Input de Archivo */
+input[type="file"] {
+    padding: 8px;
+    font-size: 12px;
+    cursor: pointer;
+}
+
+/* --- INPUT DE COLOR --- */
+/* Hacemos que parezca un botón redondo */
+input[type="color"] {
+    -webkit-appearance: none; /* Para Chrome/Safari antiguos */
+    -moz-appearance: none;    /* Para Firefox */
+    appearance: none;         /* Estándar moderno (La que te pide VS Code) */
+    
+    border: none;
+    width: 60px;
+    height: 60px;
+    cursor: pointer;
+    background: none;
+    border-radius: 50%;
+    transition: transform 0.2s;
+}
+
+input[type="color"]::-webkit-color-swatch-wrapper {
+    padding: 0; 
+}
+
+input[type="color"]::-webkit-color-swatch {
+    border: 3px solid rgba(255,255,255,0.2);
+    border-radius: 50%;
+}
+
+input[type="color"]:hover {
+    transform: scale(1.1); /* Crece un poco al pasar el mouse */
+}
+
+/* --- BOTONES --- */
+button {
+    display: block;
+    width: 100%;
+    padding: 15px;
+    
+    /* Gradiente verde moderno */
+    background: linear-gradient(135deg, #4CAF50 0%, #2E7D32 100%);
+    
+    color: white;
+    border: none;
+    border-radius: 8px;
+    font-size: 18px;
+    font-weight: bold;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    cursor: pointer;
+    margin-top: 20px;
+    box-shadow: 0 5px 15px rgba(0, 0, 0, 0.3);
+    transition: all 0.3s;
+    position: relative;
+    overflow: hidden;
+}
+
+button:hover {
+    transform: translateY(-2px); /* Se levanta un poco */
+    box-shadow: 0 8px 20px rgba(76, 175, 80, 0.4);
+    filter: brightness(1.1);
+}
+
+button:active {
+    transform: translateY(1px);
+}
+
+/* Botón REINICIAR (Estilo Rojo/Naranja) */
+#restart-btn {
+    background: linear-gradient(135deg, #FF5722 0%, #D84315 100%);
+}
+
+#restart-btn:hover {
+    box-shadow: 0 8px 20px rgba(255, 87, 34, 0.4);
+}
+
+/* --- VISTA PREVIA DE IMAGEN --- */
+#preview-container {
+    background: rgba(0,0,0,0.3);
+    padding: 10px;
+    border-radius: 8px;
+    margin-top: 10px;
+}
+
+#skin-preview {
+    box-shadow: 0 0 10px rgba(255,255,255,0.2);
+}
+
+/* --- LEADERBOARD (TOP 10) --- */
+#leaderboard {
+    position: absolute;
+    top: 20px;
+    right: 20px;
+    background: rgba(0, 0, 0, 0.6); /* Más oscuro */
+    backdrop-filter: blur(5px);
+    color: white;
+    padding: 15px;
+    border-radius: 10px;
+    width: 220px;
+    z-index: 5;
+    pointer-events: none;
+    border: 1px solid rgba(255,255,255,0.1);
+}
+
+#leaderboard h3 {
+    margin: 0 0 10px 0;
+    text-align: center;
+    font-size: 14px;
+    text-transform: uppercase;
+    color: #4CAF50; /* Color del título */
+    letter-spacing: 1px;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.2);
+    padding-bottom: 8px;
+}
+
+#leaderboard-list {
+    list-style: none;
+    font-family: 'Consolas', 'Monaco', monospace; /* Fuente tipo código para números */
+}
+
+#leaderboard-list li {
+    display: flex;
+    justify-content: space-between;
+    padding: 5px 0;
+    font-size: 13px;
+    border-bottom: 1px solid rgba(255,255,255,0.05);
+}
+
+#leaderboard-list li:first-child {
+    color: #FFD700; /* Color dorado para el #1 */
+    font-weight: bold;
+}
+
+/* --- ETIQUETAS (LABELS) --- */
+label {
+    display: block;
+    text-align: left;
+    font-size: 12px;
+    color: #aaa;
+    margin-bottom: 5px;
+    margin-top: 10px;
+    font-weight: 600;
+}

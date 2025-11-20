@@ -1,0 +1,63 @@
+<!DOCTYPE html>
+<html lang="es">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Mi Agar.io Casero</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+
+<body>
+
+  <div id="login-screen">
+    <h1>Agar Clone</h1>
+    <p>Ingresa tus datos para jugar</p>
+    <div class="player-id">Tu ID: <span id="my-id">Conectando...</span></div>
+    <input type="text" id="nickname" placeholder="Tu Nickname" maxlength="10">
+    <br>
+    <label>Elige tu color:</label>
+    <input type="color" id="color-picker" value="#ff0000">
+
+    <br><br>
+    <label>Skin Predefinida:</label>
+    <select id="skin-selector" style="padding: 10px; border-radius: 5px; width: 100%;">
+      <option value="">--- Ninguna ---</option>
+      <option value="earth">Tierra 🌍</option>
+      <option value="moon">Luna 🌑</option>
+      <option value="mars">Marte 🔴</option>
+      <option value="virus">Virus 🦠</option>
+    </select>
+
+    <p style="margin: 10px 0; font-size: 12px; color: #666;">--- O ---</p>
+
+    <label>Sube tu propia imagen:</label>
+    <input type="file" id="custom-skin-input" accept="image/*" style="margin-top: 5px; font-size: 14px;">
+
+    <div id="preview-container" class="hidden" style="margin-top: 10px;">
+      <p style="font-size: 12px;">Vista previa:</p>
+      <img id="skin-preview" src="" style="width: 50px; height: 50px; border-radius: 50%; border: 2px solid #333;">
+    </div>
+
+    <button id="play-btn">JUGAR AHORA</button>
+  </div>
+
+  <div id="game-over-screen" class="hidden">
+    <h2>¡GAME OVER!</h2>
+    <p id="killer-message"></p>
+    <button id="restart-btn">JUGAR DE NUEVO</button>
+  </div>
+
+  <div id="leaderboard" class="hidden">
+    <h3>TOP 10</h3>
+    <ul id="leaderboard-list">
+    </ul>
+  </div>
+
+  <canvas id="game-canvas"></canvas>
+
+  <script src="/socket.io/socket.io.js"></script>
+  <script src="game.js"></script>
+</body>
+
+</html>
