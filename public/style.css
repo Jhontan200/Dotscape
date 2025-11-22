@@ -1,260 +1,410 @@
 /* --- RESET Y BASE --- */
 * {
-    border: none;
     margin: 0;
     padding: 0;
     box-sizing: border-box;
-    outline: none; /* Quitar borde azul de selección */
+    outline: none;
+    user-select: none;
 }
 
 body {
-    margin: 0;
-    padding: 0;
     overflow: hidden;
-    font-family: 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
-    background-color: #111; /* Fondo un poco más oscuro */
+    font-family: 'Segoe UI', sans-serif;
+    background-color: #0b0b0b;
     color: white;
+    height: 100vh;
+    display: flex;
+    align-items: center;
+    justify-content: center;
 }
 
 canvas {
-    display: block;
     position: absolute;
     top: 0;
     left: 0;
     z-index: 1;
 }
 
-/* --- ESTILOS DE CONTENEDORES (MENÚS) --- */
-/* Efecto Glassmorphism: Fondo oscuro semitransparente con desenfoque */
+/* --- ANIMACIÓN DE ENTRADA (POP) --- */
+@keyframes popIn {
+    0% {
+        opacity: 0;
+        transform: scale(0.8) translateY(-20px);
+    }
+
+    100% {
+        opacity: 1;
+        transform: scale(1) translateY(0);
+    }
+}
+
+/* --- CONTENEDORES --- */
 #login-screen,
 #game-over-screen {
-    position: absolute;
-    top: 50%;
-    left: 50%;
-    transform: translate(-50%, -50%);
-    
-    background: rgba(30, 30, 40, 0.85); /* Fondo oscuro translúcido */
-    backdrop-filter: blur(10px);        /* Efecto de borrosidad detrás */
-    border: 1px solid rgba(255, 255, 255, 0.1); /* Borde sutil */
-    
-    padding: 40px;
-    border-radius: 20px;
+    position: relative;
+    /* Fondo con blur (efecto cristal esmerilado) */
+    background: rgba(20, 20, 25, 0.85);
+    backdrop-filter: blur(15px);
+    /* BLUR FUERTE */
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    padding: 25px;
+    border-radius: 16px;
     text-align: center;
-    box-shadow: 0 0 50px rgba(0, 0, 0, 0.8); /* Sombra grande para profundidad */
+    box-shadow: 0 15px 40px rgba(0, 0, 0, 0.5);
     z-index: 10;
-    width: 350px; /* Un poco más ancho */
-    transition: all 0.3s ease;
+    width: 360px;
+    max-width: 90%;
+    height: auto;
+
+    /* Aplicar animación */
+    animation: popIn 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
 }
 
-/* Animación suave al aparecer */
 .hidden {
     display: none !important;
-    opacity: 0;
-    pointer-events: none;
 }
 
-/* --- TIPOGRAFÍA --- */
-h1 {
-    margin-bottom: 10px;
-    color: #fff;
-    font-size: 32px;
+/* --- TIPOGRAFÍA Y LAYOUT COMÚN --- */
+h1,
+h2 {
+    margin: 0 0 15px 0;
     font-weight: 800;
-    letter-spacing: 2px;
     text-transform: uppercase;
-    text-shadow: 0 0 10px rgba(76, 175, 80, 0.5); /* Resplandor verde */
+}
+
+h1 {
+    font-size: 24px;
+    color: #eee;
 }
 
 h2 {
-    color: #ff4444;
     font-size: 28px;
-    font-weight: 800;
-    margin-bottom: 15px;
-    text-shadow: 0 0 15px rgba(255, 68, 68, 0.6); /* Resplandor rojo */
-}
-
-p {
-    color: #bbb;
-    font-size: 14px;
-    margin-bottom: 20px;
+    color: #ff4444;
+    text-shadow: 0 0 15px rgba(255, 68, 68, 0.4);
 }
 
 .player-id {
-    font-size: 12px;
-    color: #888;
-    margin-bottom: 20px;
+    font-size: 10px;
+    color: #555;
+    margin-bottom: 12px;
     font-family: monospace;
-    background: rgba(0,0,0,0.3);
-    padding: 5px;
-    border-radius: 4px;
-    display: inline-block;
 }
 
-/* --- INPUTS (TEXTO Y SELECT) --- */
-input[type="text"],
-select,
-input[type="file"] {
-    background: rgba(255, 255, 255, 0.1);
-    color: white;
-    padding: 12px;
+.row-container {
+    display: flex;
+    gap: 10px;
+    margin-bottom: 10px;
+    align-items: flex-end;
     width: 100%;
-    margin-bottom: 15px;
-    border: 2px solid transparent;
-    border-radius: 8px;
-    font-size: 16px;
-    transition: all 0.3s;
 }
 
-/* Efecto al hacer clic en el input */
+.col {
+    display: flex;
+    flex-direction: column;
+}
+
+.col.wide {
+    flex: 1;
+}
+
+label {
+    font-size: 10px;
+    color: #888;
+    margin-bottom: 3px;
+    font-weight: bold;
+    text-align: left;
+}
+
+input[type="text"],
+select {
+    background: #1a1a1a;
+    color: #ddd;
+    border: 1px solid #333;
+    padding: 8px 10px;
+    border-radius: 6px;
+    font-size: 13px;
+    width: 100%;
+    transition: 0.2s;
+}
+
 input[type="text"]:focus,
 select:focus {
-    background: rgba(255, 255, 255, 0.15);
     border-color: #4CAF50;
-    box-shadow: 0 0 10px rgba(76, 175, 80, 0.3);
+    background: #222;
 }
 
-/* Input de Archivo */
-input[type="file"] {
-    padding: 8px;
-    font-size: 12px;
-    cursor: pointer;
+#nickname {
+    margin-bottom: 10px;
+    text-align: center;
+    font-weight: bold;
+    font-size: 14px;
 }
 
-/* --- INPUT DE COLOR --- */
-/* Hacemos que parezca un botón redondo */
+/* --- COLOR PICKER REDONDO --- */
 input[type="color"] {
-    -webkit-appearance: none; /* Para Chrome/Safari antiguos */
-    -moz-appearance: none;    /* Para Firefox */
-    appearance: none;         /* Estándar moderno (La que te pide VS Code) */
-    
+    -webkit-appearance: none;
+    /* Para Chrome, Safari, Edge */
+    -moz-appearance: none;
+    /* Para Firefox */
+    appearance: none;
+    /* Estándar oficial */
+
     border: none;
-    width: 60px;
-    height: 60px;
+    width: 38px;
+    height: 38px;
     cursor: pointer;
     background: none;
-    border-radius: 50%;
-    transition: transform 0.2s;
-}
-
-input[type="color"]::-webkit-color-swatch-wrapper {
-    padding: 0; 
+    padding: 0;
 }
 
 input[type="color"]::-webkit-color-swatch {
-    border: 3px solid rgba(255,255,255,0.2);
-    border-radius: 50%;
+    border: 2px solid #333;
+    border-radius: 8px;
 }
 
-input[type="color"]:hover {
-    transform: scale(1.1); /* Crece un poco al pasar el mouse */
+.divider {
+    display: flex;
+    align-items: center;
+    text-align: center;
+    margin: 10px 0;
+    color: #444;
+    font-size: 10px;
 }
 
-/* --- BOTONES --- */
-button {
+.divider::before,
+.divider::after {
+    content: '';
+    flex: 1;
+    border-bottom: 1px solid #333;
+}
+
+.divider span {
+    padding: 0 10px;
+}
+
+input[type="file"] {
+    display: none;
+}
+
+.custom-file-upload {
     display: block;
-    width: 100%;
-    padding: 15px;
-    
-    /* Gradiente verde moderno */
-    background: linear-gradient(135deg, #4CAF50 0%, #2E7D32 100%);
-    
-    color: white;
-    border: none;
-    border-radius: 8px;
-    font-size: 18px;
-    font-weight: bold;
-    text-transform: uppercase;
-    letter-spacing: 1px;
+    border: 1px dashed #444;
+    background: rgba(255, 255, 255, 0.02);
+    color: #aaa;
+    padding: 8px;
+    border-radius: 6px;
     cursor: pointer;
-    margin-top: 20px;
-    box-shadow: 0 5px 15px rgba(0, 0, 0, 0.3);
-    transition: all 0.3s;
-    position: relative;
-    overflow: hidden;
+    font-size: 12px;
+    transition: 0.2s;
 }
 
-button:hover {
-    transform: translateY(-2px); /* Se levanta un poco */
-    box-shadow: 0 8px 20px rgba(76, 175, 80, 0.4);
-    filter: brightness(1.1);
+.custom-file-upload:hover {
+    border-color: #666;
+    color: #fff;
+    background: rgba(255, 255, 255, 0.05);
 }
 
-button:active {
-    transform: translateY(1px);
+#file-name-display {
+    font-size: 9px;
+    color: #555;
+    margin-top: 4px;
+    margin-bottom: 5px;
+    height: 12px;
 }
 
-/* Botón REINICIAR (Estilo Rojo/Naranja) */
-#restart-btn {
-    background: linear-gradient(135deg, #FF5722 0%, #D84315 100%);
-}
-
-#restart-btn:hover {
-    box-shadow: 0 8px 20px rgba(255, 87, 34, 0.4);
-}
-
-/* --- VISTA PREVIA DE IMAGEN --- */
 #preview-container {
-    background: rgba(0,0,0,0.3);
-    padding: 10px;
-    border-radius: 8px;
-    margin-top: 10px;
+    margin: 5px 0;
+    height: 40px;
+    display: flex;
+    justify-content: center;
 }
 
 #skin-preview {
-    box-shadow: 0 0 10px rgba(255,255,255,0.2);
+    width: 35px;
+    height: 35px;
+    border-radius: 50%;
+    border: 2px solid #4CAF50;
+    object-fit: cover;
 }
 
-/* --- LEADERBOARD (TOP 10) --- */
+button {
+    width: 100%;
+    padding: 12px;
+    background: #4CAF50;
+    color: white;
+    border: none;
+    border-radius: 6px;
+    font-size: 14px;
+    font-weight: 800;
+    cursor: pointer;
+    margin-top: 5px;
+    box-shadow: 0 4px 0 #2E7D32;
+    transition: 0.1s;
+}
+
+button:active {
+    transform: translateY(2px);
+    box-shadow: 0 2px 0 #2E7D32;
+}
+
+/* Botón Reiniciar */
+#restart-btn {
+    background: #FF5722;
+    box-shadow: 0 4px 0 #D84315;
+}
+
+#restart-btn:active {
+    box-shadow: 0 2px 0 #D84315;
+}
+
+/* Botón Espectador (Gris azulado) */
+.secondary-btn {
+    background: #455A64 !important;
+    box-shadow: 0 4px 0 #263238 !important;
+}
+
+.secondary-btn:active {
+    box-shadow: 0 2px 0 #263238 !important;
+}
+
+/* --- ESTILOS ESPECÍFICOS GAME OVER --- */
+
+/* Info del Asesino */
+.killer-info {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 15px;
+    margin-bottom: 20px;
+    padding-bottom: 15px;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.killer-img-container {
+    width: 50px;
+    height: 50px;
+    position: relative;
+}
+
+#killer-skin-img,
+#killer-color-circle {
+    width: 100%;
+    height: 100%;
+    border-radius: 50%;
+    border: 3px solid #fff;
+    box-shadow: 0 0 10px rgba(0, 0, 0, 0.5);
+}
+
+#killer-color-circle {
+    background-color: #fff;
+}
+
+/* Fallback si no hay imagen */
+
+.killer-text {
+    text-align: left;
+}
+
+.killer-text h3 {
+    margin: 0;
+    font-size: 16px;
+    color: #fff;
+}
+
+.killer-text p {
+    margin: 0;
+    font-size: 12px;
+    color: #aaa;
+    font-style: italic;
+}
+
+/* Grid de Estadísticas */
+.stats-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 10px;
+    margin-bottom: 20px;
+}
+
+.stat-box {
+    background: rgba(0, 0, 0, 0.3);
+    padding: 8px;
+    border-radius: 6px;
+    display: flex;
+    flex-direction: column;
+}
+
+.stat-label {
+    font-size: 10px;
+    color: #888;
+    text-transform: uppercase;
+}
+
+.stat-value {
+    font-size: 16px;
+    color: #fff;
+    font-weight: bold;
+    font-family: 'Segoe UI', sans-serif;
+}
+
+/* Leaderboard Position */
 #leaderboard {
     position: absolute;
-    top: 20px;
-    right: 20px;
-    background: rgba(0, 0, 0, 0.6); /* Más oscuro */
-    backdrop-filter: blur(5px);
-    color: white;
-    padding: 15px;
-    border-radius: 10px;
-    width: 220px;
-    z-index: 5;
+    top: 10px;
+    right: 10px;
+    background: rgba(0, 0, 0, 0.5);
+    padding: 10px;
+    border-radius: 6px;
+    width: 160px;
     pointer-events: none;
-    border: 1px solid rgba(255,255,255,0.1);
+    z-index: 20;
 }
 
 #leaderboard h3 {
-    margin: 0 0 10px 0;
+    font-size: 11px;
+    color: #4CAF50;
+    margin-bottom: 5px;
     text-align: center;
-    font-size: 14px;
-    text-transform: uppercase;
-    color: #4CAF50; /* Color del título */
-    letter-spacing: 1px;
-    border-bottom: 1px solid rgba(255, 255, 255, 0.2);
-    padding-bottom: 8px;
-}
-
-#leaderboard-list {
-    list-style: none;
-    font-family: 'Consolas', 'Monaco', monospace; /* Fuente tipo código para números */
 }
 
 #leaderboard-list li {
+    font-size: 10px;
     display: flex;
     justify-content: space-between;
-    padding: 5px 0;
-    font-size: 13px;
-    border-bottom: 1px solid rgba(255,255,255,0.05);
+    margin-bottom: 2px;
 }
 
-#leaderboard-list li:first-child {
-    color: #FFD700; /* Color dorado para el #1 */
+/* ... (Resto de tu CSS anterior) ... */
+
+/* BOTÓN SALIR DE ESPECTADOR */
+#exit-spectate-btn {
+    position: absolute;
+    bottom: 30px;
+    left: 50%;
+    transform: translateX(-50%);
+    width: auto;
+    /* Ancho automático según el texto */
+    padding: 12px 25px;
+    background: #ff4444;
+    /* Rojo llamativo */
+    color: white;
+    font-size: 14px;
     font-weight: bold;
+    border-radius: 30px;
+    /* Redondeado */
+    box-shadow: 0 5px 15px rgba(0, 0, 0, 0.5);
+    z-index: 20;
+    /* Por encima del canvas */
+    cursor: pointer;
+    transition: all 0.2s;
+    border: 2px solid rgba(255, 255, 255, 0.2);
 }
 
-/* --- ETIQUETAS (LABELS) --- */
-label {
-    display: block;
-    text-align: left;
-    font-size: 12px;
-    color: #aaa;
-    margin-bottom: 5px;
-    margin-top: 10px;
-    font-weight: 600;
+#exit-spectate-btn:hover {
+    background: #ff2222;
+    transform: translateX(-50%) scale(1.05);
+}
+
+#exit-spectate-btn:active {
+    transform: translateX(-50%) scale(0.95);
 }

@@ -1,63 +1,109 @@
 <!DOCTYPE html>
 <html lang="es">
-
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Mi Agar.io Casero</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>Agar Clone</title>
   <link rel="stylesheet" href="style.css">
 </head>
-
 <body>
 
   <div id="login-screen">
     <h1>Agar Clone</h1>
-    <p>Ingresa tus datos para jugar</p>
-    <div class="player-id">Tu ID: <span id="my-id">Conectando...</span></div>
-    <input type="text" id="nickname" placeholder="Tu Nickname" maxlength="10">
-    <br>
-    <label>Elige tu color:</label>
-    <input type="color" id="color-picker" value="#ff0000">
+    <div class="player-id">ID: <span id="my-id">...</span></div>
+    
+    <input type="text" id="nickname" placeholder="Tu Nickname" maxlength="10" autocomplete="off">
 
-    <br><br>
-    <label>Skin Predefinida:</label>
-    <select id="skin-selector" style="padding: 10px; border-radius: 5px; width: 100%;">
-      <option value="">--- Ninguna ---</option>
-      <option value="earth">Tierra 🌍</option>
-      <option value="moon">Luna 🌑</option>
-      <option value="mars">Marte 🔴</option>
-      <option value="virus">Virus 🦠</option>
-    </select>
-
-    <p style="margin: 10px 0; font-size: 12px; color: #666;">--- O ---</p>
-
-    <label>Sube tu propia imagen:</label>
-    <input type="file" id="custom-skin-input" accept="image/*" style="margin-top: 5px; font-size: 14px;">
-
-    <div id="preview-container" class="hidden" style="margin-top: 10px;">
-      <p style="font-size: 12px;">Vista previa:</p>
-      <img id="skin-preview" src="" style="width: 50px; height: 50px; border-radius: 50%; border: 2px solid #333;">
+    <div class="row-container">
+        <div class="col">
+            <label>Color</label>
+            <input type="color" id="color-picker" value="#ff0000">
+        </div>
+        <div class="col wide">
+            <label>Skin</label>
+            <select id="skin-selector">
+                <option value="">Ninguna</option>
+                <option value="earth">Tierra 🌍</option>
+                <option value="moon">Luna 🌑</option>
+                <option value="mars">Marte 🪐</option>
+                <option value="virus">Virus 🦠</option>
+            </select>
+        </div>
     </div>
 
-    <button id="play-btn">JUGAR AHORA</button>
+    <div class="divider"><span>O SUBE TU IMAGEN</span></div>
+
+    <label for="custom-skin-input" class="custom-file-upload">
+        📁 Seleccionar Imagen
+    </label>
+    <input type="file" id="custom-skin-input" accept="image/*">
+    <div id="file-name-display">Ningún archivo seleccionado</div>
+
+    <div id="preview-container" class="hidden">
+      <img id="skin-preview" src="">
+    </div>
+
+    <button id="play-btn">JUGAR</button>
   </div>
 
   <div id="game-over-screen" class="hidden">
-    <h2>¡GAME OVER!</h2>
-    <p id="killer-message"></p>
-    <button id="restart-btn">JUGAR DE NUEVO</button>
+    <h2>¡ELIMINADO!</h2>
+    
+    <div class="killer-info">
+        <div class="killer-img-container">
+            <img id="killer-skin-img" src="" class="hidden"> 
+            <div id="killer-color-circle"></div>
+        </div>
+        <div class="killer-text">
+            <h3 id="killer-name">Nombre</h3>
+            <p id="death-message">te ha comido</p>
+        </div>
+    </div>
+
+    <div class="stats-grid">
+        <div class="stat-box">
+            <span class="stat-label">Masa Final</span>
+            <span class="stat-value" id="stat-final-mass">0</span>
+        </div>
+        <div class="stat-box">
+            <span class="stat-label">Ranking</span>
+            <span class="stat-value" id="stat-rank">#0</span>
+        </div>
+        <div class="stat-box">
+            <span class="stat-label">Comida</span>
+            <span class="stat-value" id="stat-food">0</span>
+        </div>
+        <div class="stat-box">
+            <span class="stat-label">Tiempo</span>
+            <span class="stat-value" id="stat-time">0s</span>
+        </div>
+    </div>
+
+    <div class="row-container">
+        <button id="spectate-btn" class="secondary-btn">ESPECTADOR</button>
+        <button id="restart-btn">REINICIAR</button>
+    </div>
   </div>
 
   <div id="leaderboard" class="hidden">
     <h3>TOP 10</h3>
-    <ul id="leaderboard-list">
-    </ul>
+    <ul id="leaderboard-list"></ul>
   </div>
+
+  <button id="exit-spectate-btn" class="hidden">❌ SALIR AL MENÚ</button>
 
   <canvas id="game-canvas"></canvas>
 
   <script src="/socket.io/socket.io.js"></script>
   <script src="game.js"></script>
+  
+  <script>
+    document.getElementById('custom-skin-input').addEventListener('change', function(){
+        var fileName = this.files[0] ? this.files[0].name : "Ningún archivo seleccionado";
+        if(fileName.length > 20) fileName = fileName.substring(0, 17) + "...";
+        document.getElementById('file-name-display').textContent = fileName;
+    });
+  </script>
 </body>
 
 </html>
