@@ -9,7 +9,9 @@ const PORT = process.env.PORT || 3000;
 const MAX_PLAYERS = 10;
 const MAP_WIDTH = 3000;
 const MAP_HEIGHT = 3000;
-const TICK_RATE = 60;
+
+// --- OPTIMIZACIÓN 1: BAJAR TICK RATE ---
+const TICK_RATE = 60; 
 
 const MAX_FOOD = 200;
 const BASE_SPEED = 8;
@@ -209,7 +211,7 @@ setInterval(() => {
     }
   }
 
-  // --- CALCULAR LEADERBOARD PRIMERO (Para saber el Rank actual) ---
+  // --- CALCULAR LEADERBOARD PRIMERO ---
   const leaderboard = Object.values(players)
     .filter(p => p.playing)
     .map(p => ({
@@ -219,7 +221,7 @@ setInterval(() => {
     }))
     .sort((a, b) => b.score - a.score);
 
-  // LOGICA JUGADORES
+  // LOGICA JUGADORES (FÍSICA, MOVIMIENTO, INTERACCIONES)
   for (const id in players) {
     const p = players[id];
     if (!p.playing) continue;
@@ -264,7 +266,7 @@ setInterval(() => {
         if (Math.sqrt((cell.x - f.x) ** 2 + (cell.y - f.y) ** 2) < cell.radius) {
           cell.mass += 0.5;
           cell.radius = cell.mass;
-          p.cellsEaten++; // Aumentar contador
+          p.cellsEaten++;
           food.splice(i, 1);
         }
       }
@@ -366,10 +368,9 @@ setInterval(() => {
             cA.mass += cB.mass;
             cA.radius = cA.mass;
             
-            pA.cellsEaten++; // Contar como comida
+            pA.cellsEaten++;
 
             if (pB.cells.length === 1) {
-              // --- JUGADOR MUERTO (Última célula) ---
               const timeAlive = Date.now() - pB.startTime;
               const randomPhrase = DEATH_PHRASES[Math.floor(Math.random() * DEATH_PHRASES.length)];
               
@@ -378,10 +379,10 @@ setInterval(() => {
                   killerSkin: pA.skin,
                   killerCustomSkin: pA.customSkin,
                   killerColor: pA.color,
-                  killerId: pA.id, // ID del asesino para espectar
+                  killerId: pA.id, 
                   message: randomPhrase,
                   stats: {
-                      finalMass: Math.floor(cB.mass), // Masa al morir
+                      finalMass: Math.floor(cB.mass),
                       maxMass: pB.maxMass,
                       timeAlive: timeAlive,
                       cellsEaten: pB.cellsEaten,
@@ -401,12 +402,14 @@ setInterval(() => {
     }
   }
 
-  // PREPARAR DATOS
-  const playersData = {};
+  // --- OPTIMIZACIÓN 2: VIEW CULLING (RECORTE DE VISIÓN) ---
+  
+  // 1. Preparamos los jugadores reducidos (con redondeo) para no recalcularlos N veces
+  const reducedPlayers = {};
   for (let id in players) {
     const p = players[id];
     if (p.playing) {
-      playersData[id] = {
+      reducedPlayers[id] = {
         id: p.id,
         nickname: p.nickname,
         color: p.color,
@@ -414,15 +417,100 @@ setInterval(() => {
         customSkin: p.customSkin,
         cells: p.cells.map(c => ({
           id: c.id,
-          x: c.x,
-          y: c.y,
-          radius: c.radius
+          x: Math.round(c.x), // Redondear coordenadas
+          y: Math.round(c.y),
+          radius: Math.round(c.radius)
         }))
       };
     }
   }
 
-  io.emit('stateUpdate', { players: playersData, food, ejectedMass, viruses, leaderboard: leaderboard.slice(0, 10) });
+  // 2. Obtenemos todos los sockets conectados
+  const connectedSockets = io.sockets.sockets;
+
+  // 3. Iteramos sobre cada cliente conectado
+  for (const [socketId, socket] of connectedSockets) {
+    const p = players[socketId];
+    
+    // Variables para definir el área de visión
+    let viewX = MAP_WIDTH / 2;
+    let viewY = MAP_HEIGHT / 2;
+    let viewDist = 1500; // Vista base bastante amplia
+
+    // Si el jugador está jugando, centramos la cámara en sus células
+    if (p && p.playing && p.cells.length > 0) {
+        let totalX = 0, totalY = 0, totalMass = 0;
+        p.cells.forEach(c => {
+            totalX += c.x;
+            totalY += c.y;
+            totalMass += c.mass;
+        });
+        viewX = totalX / p.cells.length;
+        viewY = totalY / p.cells.length;
+        
+        // Aumentar el rango de visión si el jugador es grande (Zoom out)
+        viewDist += Math.sqrt(totalMass) * 2; 
+    }
+    
+    // --- FILTRADO (CULLING) ---
+    
+    // Filtrar COMIDA visible (con redondeo)
+    const visibleFood = food.filter(f => 
+        Math.abs(f.x - viewX) < viewDist && 
+        Math.abs(f.y - viewY) < viewDist
+    ).map(f => ({
+        x: Math.round(f.x),
+        y: Math.round(f.y),
+        color: f.color
+    }));
+
+    // Filtrar VIRUS visibles (con redondeo)
+    const visibleViruses = viruses.filter(v => 
+        Math.abs(v.x - viewX) < viewDist && 
+        Math.abs(v.y - viewY) < viewDist
+    ).map(v => ({
+        id: v.id,
+        x: Math.round(v.x),
+        y: Math.round(v.y),
+        radius: Math.round(v.radius)
+    }));
+
+    // Filtrar MASA EYECTADA visible (con redondeo)
+    const visibleEjected = ejectedMass.filter(em => 
+        Math.abs(em.x - viewX) < viewDist && 
+        Math.abs(em.y - viewY) < viewDist
+    ).map(em => ({
+        id: em.id,
+        x: Math.round(em.x),
+        y: Math.round(em.y),
+        radius: Math.round(em.radius),
+        color: em.color
+    }));
+
+    // Filtrar JUGADORES visibles
+    const visiblePlayers = {};
+    for (let pid in reducedPlayers) {
+        const rp = reducedPlayers[pid];
+        // Comprobamos si ALGUNA célula del jugador rival es visible
+        const isVisible = rp.cells.some(c => 
+            Math.abs(c.x - viewX) < viewDist + 500 && // Buffer extra para jugadores
+            Math.abs(c.y - viewY) < viewDist + 500
+        );
+        
+        if (isVisible) {
+            visiblePlayers[pid] = rp;
+        }
+    }
+
+    // Enviamos el paquete personalizado SOLO a este socket
+    socket.emit('stateUpdate', { 
+        players: visiblePlayers, 
+        food: visibleFood, 
+        ejectedMass: visibleEjected, 
+        viruses: visibleViruses, 
+        leaderboard: leaderboard.slice(0, 10) 
+    });
+  }
 
 }, 1000 / TICK_RATE);
 

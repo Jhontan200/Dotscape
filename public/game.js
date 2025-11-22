@@ -6,7 +6,7 @@ const gameOverScreen = document.getElementById('game-over-screen');
 const playBtn = document.getElementById('play-btn');
 const restartBtn = document.getElementById('restart-btn');
 const spectateBtn = document.getElementById('spectate-btn');
-const exitSpectateBtn = document.getElementById('exit-spectate-btn'); // NUEVO
+const exitSpectateBtn = document.getElementById('exit-spectate-btn');
 
 const nicknameInput = document.getElementById('nickname');
 const colorInput = document.getElementById('color-picker');
@@ -312,8 +312,25 @@ function draw() {
         camX = 1500; camY = 1500; totalMassForZoom = 100;
     }
 
-    let targetZoom = 50 / (Math.sqrt(totalMassForZoom) + 40);
-    targetZoom = Math.max(0.1, Math.min(1.5, targetZoom));
+    // --- MEJORA DE CÁMARA (Zoom Normalizado por Pantalla) ---
+    // 1. Zoom base según la masa
+    let massZoom = 50 / (Math.sqrt(totalMassForZoom) + 40);
+
+    // 2. Factor de corrección de pantalla (Base 1920x1080)
+    const baseWidth = 1920;
+    const baseHeight = 1080;
+    let screenFactor = Math.max(canvas.width / baseWidth, canvas.height / baseHeight);
+
+    // 3. Aplicamos factor al zoom
+    let targetZoom = massZoom * screenFactor;
+
+    // 4. Límites de zoom ajustados al tamaño de pantalla
+    const minZoom = 0.1 * screenFactor;
+    const maxZoom = 1.5 * screenFactor;
+    
+    targetZoom = Math.max(minZoom, Math.min(maxZoom, targetZoom));
+    // --------------------------------------------------------
+
     viewZoom = lerp(viewZoom, targetZoom, 0.05);
 
     for (const id in players) {
