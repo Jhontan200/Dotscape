@@ -3,11 +3,6 @@ const socket = io();
 // DOM Elements
 const loginScreen = document.getElementById('login-screen');
 const gameOverScreen = document.getElementById('game-over-screen');
-const playBtn = document.getElementById('play-btn');
-const restartBtn = document.getElementById('restart-btn');
-const spectateBtn = document.getElementById('spectate-btn');
-const exitSpectateBtn = document.getElementById('exit-spectate-btn');
-
 const nicknameInput = document.getElementById('nickname');
 const colorInput = document.getElementById('color-picker');
 const skinSelector = document.getElementById('skin-selector');
@@ -26,10 +21,58 @@ const statRank = document.getElementById('stat-rank');
 const statFood = document.getElementById('stat-food');
 const statTime = document.getElementById('stat-time');
 
+// Botones de Navegación (Game Over)
+const playBtn = document.getElementById('play-btn');
+const goSpectateBtn = document.getElementById('go-spectate-btn');
+const goMenuBtn = document.getElementById('go-menu-btn');
+const restartBtn = document.getElementById('restart-btn');
+
+// Controles de Espectador (Barra Inferior)
+const spectatorControls = document.getElementById('spectator-controls');
+const specDetailsBtn = document.getElementById('spec-details-btn');
+const specRestartBtn = document.getElementById('spec-restart-btn');
+const specMenuBtn = document.getElementById('spec-menu-btn');
+
 const leaderboardDiv = document.getElementById('leaderboard');
 const leaderboardList = document.getElementById('leaderboard-list');
 const canvas = document.getElementById('game-canvas');
 const ctx = canvas.getContext('2d');
+
+
+const lobbyScreen = document.getElementById('lobby-screen');
+const playerCountDiv = document.getElementById('player-count');
+
+const lobbyPlayerList = document.getElementById('lobby-player-list');
+const countdownOverlay = document.getElementById('countdown-overlay');
+const countdownNumber = document.getElementById('countdown-number');
+
+const victoryScreen = document.getElementById('victory-screen');
+const winnerNameText = document.getElementById('winner-name');
+const finalLeaderboardList = document.getElementById('final-leaderboard-list');
+const restartCountdownSpan = document.getElementById('restart-countdown');
+
+// --- PALETA DE COLORES NEÓN ---
+const neonColors = [
+    "#FF0055", // Neon Red/Pink
+    "#00FF55", // Neon Green
+    "#5500FF", // Neon Indigo
+    "#FFFF00", // Neon Yellow
+    "#00FFFF", // Cyan
+    "#FF00FF", // Magenta
+    "#FF5500", // Neon Orange
+    "#AA00FF", // Purple
+    "#00FF00", // Lime
+    "#0080FF"  // Azure
+];
+
+// Función para asignar un color aleatorio al iniciar
+function setRandomNeonColor() {
+    const randomColor = neonColors[Math.floor(Math.random() * neonColors.length)];
+    colorInput.value = randomColor;
+}
+
+// Ejecutamos esto apenas carga el script
+setRandomNeonColor();
 
 // Game State
 let myId = null;
@@ -37,8 +80,11 @@ let players = {};
 let food = [];
 let ejectedMass = [];
 let viruses = [];
+
+// Coordenadas del Mouse (Locales)
 let mouseX = 0;
 let mouseY = 0;
+
 let myCustomSkinData = null;
 let viewZoom = 1;
 
@@ -59,15 +105,18 @@ const customSkinCache = {};
 // Canvas Resize
 canvas.width = window.innerWidth; canvas.height = window.innerHeight;
 window.addEventListener('resize', () => { canvas.width = window.innerWidth; canvas.height = window.innerHeight; });
-canvas.addEventListener('mousemove', (e) => { mouseX = e.clientX; mouseY = e.clientY; });
+canvas.addEventListener('mousemove', (e) => {
+    mouseX = e.clientX;
+    mouseY = e.clientY;
+});
 
 // Controls
 window.addEventListener('keydown', (e) => {
     if (e.code === 'Space') socket.emit('split');
     if (e.code === 'KeyW') socket.emit('eject');
-    // Atajo ESC para salir del espectador
+    // Atajo ESC lleva al menú si estás espectando
     if (e.code === 'Escape' && isSpectating) {
-        exitSpectatorMode();
+        goToMenu();
     }
 });
 
@@ -101,6 +150,42 @@ skinSelector.addEventListener('change', () => {
 // --- SOCKET EVENTS ---
 socket.on('playerInfo', (id) => { myId = id; myIdSpan.innerText = id; });
 socket.on('serverFull', (msg) => { alert(msg); location.reload(); });
+
+// Actualización de la sala de espera
+// 1. EVENTO PRIVADO: Solo se ejecuta cuando YO entro a la sala
+socket.on('joinedLobby', () => {
+    loginScreen.classList.add('hidden');
+    gameOverScreen.classList.add('hidden');
+    spectatorControls.classList.add('hidden');
+    lobbyScreen.classList.remove('hidden');
+});
+
+// 2. EVENTO PÚBLICO: Se ejecuta para TODOS (actualiza la lista)
+socket.on('lobbyUpdate', (data) => {
+    // NOTA: Ya NO ocultamos/mostramos pantallas aquí. 
+    // Solo actualizamos los datos visuales.
+
+    // Actualizar contador
+    playerCountDiv.innerText = `${data.count} / ${data.required}`;
+
+    // Actualizar lista de nombres
+    lobbyPlayerList.innerHTML = '';
+    data.names.forEach((name, index) => {
+        const li = document.createElement('li');
+        li.innerText = `${index + 1}. ${name}`;
+        lobbyPlayerList.appendChild(li);
+    });
+});
+
+// El juego ha comenzado
+socket.on('gameStarted', () => {
+    lobbyScreen.classList.add('hidden');
+    loginScreen.classList.add('hidden');
+    countdownOverlay.classList.add('hidden');
+    leaderboardDiv.classList.remove('hidden');
+
+    if (!inputInterval) startInputLoop();
+});
 
 socket.on('stateUpdate', (data) => {
     food = data.food;
@@ -171,57 +256,127 @@ socket.on('gameOver', (data) => {
 
     gameOverScreen.classList.remove('hidden');
     leaderboardDiv.classList.add('hidden');
+    spectatorControls.classList.add('hidden');
 });
 
-// --- BUTTONS & ACTIONS ---
+socket.on('startCountdown', (seconds) => {
+    // Ocultar lobby, mostrar cuenta regresiva
+    lobbyScreen.classList.add('hidden');
+    countdownOverlay.classList.remove('hidden');
+
+    let counter = seconds;
+    countdownNumber.innerText = counter;
+
+    const interval = setInterval(() => {
+        counter--;
+        if (counter > 0) {
+            countdownNumber.innerText = counter;
+        } else {
+            // Cuando llega a 0, limpiamos (el evento gameStarted se encargará de quitar el overlay)
+            clearInterval(interval);
+        }
+    }, 1000);
+});
+
+
+socket.on('roundWon', (data) => {
+    // 1. Ocultar HUD del juego
+    leaderboardDiv.classList.add('hidden');
+
+    // 2. Llenar datos de victoria
+    winnerNameText.innerText = data.winnerName;
+
+    // Llenar el Top 10 final
+    finalLeaderboardList.innerHTML = '';
+    data.leaderboard.forEach((player, index) => {
+        const li = document.createElement('li');
+        li.innerHTML = `<span>#${index + 1} ${player.name}</span> <span>${player.score}</span>`;
+        finalLeaderboardList.appendChild(li);
+    });
+
+    // 3. Mostrar pantalla
+    victoryScreen.classList.remove('hidden');
+
+    // 4. Cuenta regresiva visual de 10s
+    let timeLeft = 10;
+    restartCountdownSpan.innerText = timeLeft;
+    const timer = setInterval(() => {
+        timeLeft--;
+        if (timeLeft >= 0) restartCountdownSpan.innerText = timeLeft;
+        else clearInterval(timer);
+    }, 1000);
+});
+
+socket.on('serverReset', () => {
+    // Recargar la página es la forma más limpia de resetear todo el estado local
+    // O llamar a goToMenu() y limpiar variables manualmente.
+    // Dado que pediste "volver a poner nombre", location.reload() es lo más seguro y fácil.
+    location.reload();
+});
+
+// --- LÓGICA DE BOTONES Y NAVEGACIÓN ---
 
 playBtn.addEventListener('click', joinGame);
 
-// Reiniciar Inmediato
+// 1. Acciones desde GAME OVER
 restartBtn.addEventListener('click', () => {
     gameOverScreen.classList.add('hidden');
+    spectatorControls.classList.add('hidden');
     isSpectating = false;
-    exitSpectateBtn.classList.add('hidden'); // Asegurar que se oculte
     joinGame();
 });
 
-// Activar Espectador
-spectateBtn.addEventListener('click', () => {
+goMenuBtn.addEventListener('click', goToMenu);
+
+goSpectateBtn.addEventListener('click', () => {
     gameOverScreen.classList.add('hidden');
     leaderboardDiv.classList.remove('hidden');
-
-    // --- MOSTRAR EL BOTÓN DE SALIDA ---
-    exitSpectateBtn.classList.remove('hidden');
+    spectatorControls.classList.remove('hidden');
     isSpectating = true;
 });
 
-// Salir de Espectador (Volver al Login)
-exitSpectateBtn.addEventListener('click', exitSpectatorMode);
+// 2. Acciones desde MODO ESPECTADOR
+specDetailsBtn.addEventListener('click', () => {
+    spectatorControls.classList.add('hidden');
+    leaderboardDiv.classList.add('hidden');
+    gameOverScreen.classList.remove('hidden');
+});
 
-function exitSpectatorMode() {
+specRestartBtn.addEventListener('click', () => {
+    spectatorControls.classList.add('hidden');
+    gameOverScreen.classList.add('hidden');
+    isSpectating = false;
+    joinGame();
+});
+
+specMenuBtn.addEventListener('click', goToMenu);
+
+// Función auxiliar para ir al menú
+function goToMenu() {
+    gameOverScreen.classList.add('hidden');
+    spectatorControls.classList.add('hidden');
+    leaderboardDiv.classList.add('hidden');
+    loginScreen.classList.remove('hidden');
     isSpectating = false;
     spectateTargetId = null;
-
-    // Ocultar botón de salida
-    exitSpectateBtn.classList.add('hidden');
-
-    // Ocultar leaderboard (opcional, pero limpio)
-    leaderboardDiv.classList.add('hidden');
-
-    // Mostrar pantalla de inicio
-    loginScreen.classList.remove('hidden');
 }
 
 function joinGame() {
-    const name = nicknameInput.value || 'SinNombre';
+    const name = nicknameInput.value.trim() || ''; // .trim() quita espacios
+
+    // REQUISITO: Nombre obligatorio
+    if (name.length === 0) {
+        alert("¡Debes ponerte un nombre para jugar!");
+        return;
+    }
+
     const color = colorInput.value;
     const skin = skinSelector.value;
 
-    loginScreen.classList.add('hidden');
-    leaderboardDiv.classList.remove('hidden');
-
+    // Enviamos la petición, pero NO ocultamos el login todavía manualmente.
+    // Esperaremos a que el servidor nos diga que entramos a la sala.
     socket.emit('startGame', { nickname: name, color: color, skin: skin, customSkin: myCustomSkinData });
-    if (!inputInterval) startInputLoop();
+
 }
 
 function updateLeaderboard(topPlayers) {
@@ -229,7 +384,15 @@ function updateLeaderboard(topPlayers) {
     if (!topPlayers) return;
     topPlayers.forEach((player, index) => {
         const li = document.createElement('li');
-        li.innerHTML = `<span>#${index + 1} ${player.name}</span> <span>${player.score}</span>`;
+
+        // Creamos el HTML con el estilo de color
+        // Usamos text-shadow para que se lea bien si el color es muy oscuro
+        li.innerHTML = `
+            <span style="color: ${player.color}; text-shadow: 0 0 2px black; font-weight: bold;">
+                #${index + 1} ${player.name}
+            </span> 
+            <span>${player.score}</span>
+        `;
         leaderboardList.appendChild(li);
     });
 }
@@ -312,24 +475,15 @@ function draw() {
         camX = 1500; camY = 1500; totalMassForZoom = 100;
     }
 
-    // --- MEJORA DE CÁMARA (Zoom Normalizado por Pantalla) ---
-    // 1. Zoom base según la masa
+    // --- MEJORA DE CÁMARA ---
     let massZoom = 50 / (Math.sqrt(totalMassForZoom) + 40);
-
-    // 2. Factor de corrección de pantalla (Base 1920x1080)
     const baseWidth = 1920;
     const baseHeight = 1080;
     let screenFactor = Math.max(canvas.width / baseWidth, canvas.height / baseHeight);
-
-    // 3. Aplicamos factor al zoom
     let targetZoom = massZoom * screenFactor;
-
-    // 4. Límites de zoom ajustados al tamaño de pantalla
     const minZoom = 0.1 * screenFactor;
     const maxZoom = 1.5 * screenFactor;
-    
     targetZoom = Math.max(minZoom, Math.min(maxZoom, targetZoom));
-    // --------------------------------------------------------
 
     viewZoom = lerp(viewZoom, targetZoom, 0.05);
 
@@ -384,8 +538,10 @@ function draw() {
         if (cell.y < cell.radius) { const w = Math.sqrt(Math.abs(cell.radius ** 2 - cell.y ** 2)); ctx.beginPath(); ctx.moveTo(-w, -cell.y); ctx.lineTo(w, -cell.y); ctx.stroke(); }
         if (cell.y > 3000 - cell.radius) { const d = 3000 - cell.y; const w = Math.sqrt(Math.abs(cell.radius ** 2 - d ** 2)); ctx.beginPath(); ctx.moveTo(-w, d); ctx.lineTo(w, d); ctx.stroke(); }
 
+        // --- CAMBIO AQUÍ: NOMBRE MÁS GRANDE ---
         if (cell.radius > 5) {
-            ctx.fillStyle = 'white'; ctx.font = `bold ${Math.max(10, cell.radius * 0.3)}px Arial`;
+            // Aumenté el tamaño base de 10 a 16 y el multiplicador de 0.3 a 0.5
+            ctx.fillStyle = 'white'; ctx.font = `bold ${Math.max(16, cell.radius * 0.5)}px Arial`;
             ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.strokeStyle = 'black'; ctx.lineWidth = 2;
             ctx.strokeText(cell.nickname, 0, 0); ctx.fillText(cell.nickname, 0, 0);
         }

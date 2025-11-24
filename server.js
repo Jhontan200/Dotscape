@@ -6,14 +6,18 @@ const { Server } = require("socket.io");
 const io = new Server(server);
 
 const PORT = process.env.PORT || 3000;
-const MAX_PLAYERS = 10;
+
+const WINNING_SCORE = 50; // Meta para ganar
+
+const MAX_PLAYERS = 2;
 const MAP_WIDTH = 3000;
 const MAP_HEIGHT = 3000;
 
 // --- OPTIMIZACIÓN 1: BAJAR TICK RATE ---
-const TICK_RATE = 60; 
+const TICK_RATE = 60;
 
-const MAX_FOOD = 200;
+// --- CAMBIO AQUÍ: MÁS COMIDA ---
+const MAX_FOOD = 250;
 const BASE_SPEED = 8;
 const MAX_CELLS = 16;
 const MERGE_TIMER = 45000;
@@ -23,24 +27,34 @@ const EJECT_SPEED = 28;
 
 // --- CONFIGURACIÓN VIRUS ---
 const MAX_VIRUSES = 15;
-const VIRUS_MASS = 60;   
-const VIRUS_RADIUS = 60; 
+const VIRUS_MASS = 60;
+const VIRUS_RADIUS = 60;
 
 // --- FRASES DE MUERTE ALEATORIAS ---
 const DEATH_PHRASES = [
-    "ha cenado contigo",
-    "te ha aplastado sin piedad",
-    "te ha borrado del mapa",
-    "usó tu masa para crecer",
-    "te ha absorbido",
-    "te pasó por encima",
-    "te convirtió en su merienda"
+  "ha cenado contigo",
+  "te ha aplastado sin piedad",
+  "te ha borrado del mapa",
+  "usó tu masa para crecer",
+  "te ha absorbido",
+  "te pasó por encima",
+  "te convirtió en su merienda"
 ];
+
+// --- ESTADOS DEL JUEGO ---
+const GAME_STATE = {
+  WAITING: 0,   // Sala de espera
+  nY_PLAYING: 1, // Juego en curso
+  ENDED: 2      // Juego terminado (mostrando ganador)
+};
 
 let food = [];
 let players = {};
 let ejectedMass = [];
-let viruses = []; 
+let viruses = [];
+
+let currentGameState = GAME_STATE.WAITING;
+let waitingPlayers = []; // Lista de sockets esperando
 
 let uniqueCellIdCounter = 0;
 function getCellId() {
@@ -63,6 +77,20 @@ function createVirus() {
     radius: VIRUS_RADIUS,
     mass: VIRUS_MASS
   };
+}
+
+// Función auxiliar para enviar el estado del lobby a todos
+function broadcastLobbyUpdate() {
+  // Mapeamos los IDs de espera a sus Nombres reales
+  const namesList = waitingPlayers.map(id => {
+    return players[id] ? players[id].nickname : 'Desconocido';
+  });
+
+  io.emit('lobbyUpdate', {
+    count: waitingPlayers.length,
+    required: MAX_PLAYERS,
+    names: namesList // Enviamos la lista de nombres
+  });
 }
 
 for (let i = 0; i < MAX_FOOD; i++) food.push(createFood());
@@ -99,30 +127,47 @@ io.on('connection', (socket) => {
   socket.emit('playerInfo', socket.id);
 
   socket.on('startGame', (data) => {
+    // Solo permitimos unirse si estamos en modo ESPERA
+    if (currentGameState !== GAME_STATE.WAITING) {
+      socket.emit('serverFull', 'Partida en curso. Espera a que termine.');
+      return;
+    }
+
+    // Validar nombre obligatorio (Requisito UI)
+    const name = data.nickname.trim().substring(0, 10);
+    if (!name) return; // Si no hay nombre, ignorar
+
     if (players[socket.id]) {
       const p = players[socket.id];
-      p.nickname = data.nickname.substring(0, 10) || 'Player';
+      p.nickname = name || 'Jugador';
       p.color = data.color;
       p.skin = data.skin;
       p.customSkin = data.customSkin;
-      p.playing = true;
-      
-      // Reiniciar estadísticas
-      p.startTime = Date.now();
-      p.maxMass = 20;
-      p.cellsEaten = 0;
-      p.bestRank = Object.keys(players).length; // Empezamos últimos
 
-      p.cells = [{
-        id: getCellId(),
-        x: Math.random() * MAP_WIDTH,
-        y: Math.random() * MAP_HEIGHT,
-        radius: 20,
-        mass: 20,
-        speedX: 0,
-        speedY: 0,
-        mergeTime: 0
-      }];
+      // IMPORTANTE: Aún NO está jugando (playing = false)
+      p.playing = false;
+      p.isReady = true; // Nuevo flag para saber que está en sala de espera
+
+      // Verificar si ya está en la lista de espera para no duplicar
+      if (!waitingPlayers.includes(socket.id)) {
+        waitingPlayers.push(socket.id);
+      }
+
+      socket.emit('joinedLobby');
+      // 1. Enviamos la actualización con nombres
+      broadcastLobbyUpdate();
+
+      // 2. Comprobamos si llenamos la sala
+      if (waitingPlayers.length >= MAX_PLAYERS) {
+        // EN LUGAR DE startGameRound(), iniciamos la cuenta regresiva
+        console.log("Iniciando cuenta regresiva...");
+        io.emit('startCountdown', 3); // Avisamos a los clientes: "3 segundos"
+
+        // El servidor espera 3 segundos antes de crear las células
+        setTimeout(() => {
+          startGameRound();
+        }, 3000);
+      }
     }
   });
 
@@ -192,8 +237,75 @@ io.on('connection', (socket) => {
 
   socket.on('disconnect', () => {
     delete players[socket.id];
+
+    // Si estaba esperando, lo sacamos de la lista
+    const index = waitingPlayers.indexOf(socket.id);
+    if (index !== -1) {
+      waitingPlayers.splice(index, 1);
+      if (currentGameState === GAME_STATE.WAITING) {
+        broadcastLobbyUpdate(); // Usamos la nueva función
+      }
+    }
   });
 });
+
+function startGameRound() {
+  console.log('🚀 INICIANDO RONDA CON 10 JUGADORES');
+  currentGameState = GAME_STATE.PLAYING;
+
+  // Recorrer a los jugadores en espera y "spawnearlos"
+  waitingPlayers.forEach(socketId => {
+    const p = players[socketId];
+    if (p) {
+      p.playing = true; // Ahora sí juegan
+      // Reiniciar estadísticas y posición
+      p.startTime = Date.now();
+      p.maxMass = 20;
+      p.cellsEaten = 0;
+      p.cells = [{
+        id: getCellId(),
+        x: Math.random() * MAP_WIDTH,
+        y: Math.random() * MAP_HEIGHT,
+        radius: 20,
+        mass: 20,
+        speedX: 0,
+        speedY: 0,
+        mergeTime: 0
+      }];
+    }
+  });
+
+  // Avisar al frontend que el juego inició
+  io.emit('gameStarted');
+}
+
+function resetServer() {
+  console.log('🔄 REINICIANDO SERVIDOR PARA NUEVA RONDA...');
+
+  currentGameState = GAME_STATE.WAITING;
+  waitingPlayers = []; // Vaciamos la lista de espera
+
+  // Limpiamos el mapa
+  food = [];
+  ejectedMass = [];
+  viruses = [];
+  for (let i = 0; i < MAX_FOOD; i++) food.push(createFood());
+  for (let i = 0; i < MAX_VIRUSES; i++) viruses.push(createVirus());
+
+  // Reseteamos a los jugadores conectados
+  for (const id in players) {
+    const p = players[id];
+    if (!p.playing || currentGameState === GAME_STATE.ENDED) continue;
+
+    p.playing = false;
+    p.cells = [];
+    p.nickname = 'Guest'; // Borramos el nombre para obligar a ponerlo de nuevo
+    // IMPORTANTE: No los desconectamos del socket, solo del juego lógico
+  }
+
+  // Avisamos a todos los clientes que vuelvan al menú
+  io.emit('serverReset');
+}
 
 setInterval(() => {
   const now = Date.now();
@@ -215,9 +327,10 @@ setInterval(() => {
   const leaderboard = Object.values(players)
     .filter(p => p.playing)
     .map(p => ({
-        id: p.id,
-        name: p.nickname,
-        score: Math.floor(p.cells.reduce((acc, c) => acc + c.mass, 0))
+      id: p.id,
+      name: p.nickname,
+      score: Math.floor(p.cells.reduce((acc, c) => acc + c.mass, 0)),
+      color: p.color
     }))
     .sort((a, b) => b.score - a.score);
 
@@ -227,9 +340,28 @@ setInterval(() => {
     if (!p.playing) continue;
 
     // 1. ACTUALIZAR ESTADÍSTICAS
+    // 1. ACTUALIZAR ESTADÍSTICAS Y VERIFICAR VICTORIA
     const currentTotalMass = Math.floor(p.cells.reduce((acc, c) => acc + c.mass, 0));
     if (currentTotalMass > p.maxMass) p.maxMass = currentTotalMass;
-    
+
+    // --- CONDICIÓN DE VICTORIA ---
+    if (currentGameState === GAME_STATE.PLAYING && currentTotalMass >= WINNING_SCORE) {
+      currentGameState = GAME_STATE.ENDED; // Congelar lógica del juego
+
+      console.log(`🏆 GANADOR: ${p.nickname} con ${currentTotalMass} puntos`);
+
+      // Enviamos el evento de victoria a TODOS
+      io.emit('roundWon', {
+        winnerName: p.nickname,
+        leaderboard: leaderboard.slice(0, 10) // Enviamos el top 10 final
+      });
+
+      // Temporizador de 10 segundos para reiniciar
+      setTimeout(() => {
+        resetServer();
+      }, 10000);
+    }
+
     // Buscar mi posición en el ranking
     const myRank = leaderboard.findIndex(l => l.id === p.id) + 1;
     if (myRank > 0 && myRank < p.bestRank) p.bestRank = myRank;
@@ -252,7 +384,7 @@ setInterval(() => {
       cell.speedX *= 0.9;
       cell.speedY *= 0.9;
 
-      const wallForce = 0.8; 
+      const wallForce = 0.8;
       if (cell.x < cell.radius) cell.speedX += wallForce;
       if (cell.x > MAP_WIDTH - cell.radius) cell.speedX -= wallForce;
       if (cell.y < cell.radius) cell.speedY += wallForce;
@@ -270,7 +402,7 @@ setInterval(() => {
           food.splice(i, 1);
         }
       }
-      
+
       // COMER MASA
       for (let i = ejectedMass.length - 1; i >= 0; i--) {
         const em = ejectedMass[i];
@@ -287,13 +419,13 @@ setInterval(() => {
         const distV = Math.sqrt((cell.x - v.x) ** 2 + (cell.y - v.y) ** 2);
         if (distV < cell.radius + v.radius) {
           if (cell.mass < VIRUS_MASS) {
-            continue; 
+            continue;
           } else {
             viruses.splice(vIndex, 1);
             viruses.push(createVirus());
             const maxSplits = MAX_CELLS - (p.cells.length + virusExplosionCells.length);
             if (maxSplits > 0) {
-              const pieces = Math.min(maxSplits, 8); 
+              const pieces = Math.min(maxSplits, 8);
               const massPerPiece = cell.mass / (pieces + 1);
               cell.mass = massPerPiece;
               cell.radius = massPerPiece;
@@ -356,7 +488,7 @@ setInterval(() => {
   while (food.length < MAX_FOOD) food.push(createFood());
   while (viruses.length < MAX_VIRUSES) viruses.push(createVirus());
 
-  // PvP & GAME OVER
+  // PvP & GAME OVER (CORREGIDO)
   const allPlayers = Object.values(players).filter(p => p.playing);
   for (const pA of allPlayers) {
     for (const pB of allPlayers) {
@@ -367,34 +499,40 @@ setInterval(() => {
           if (dist < cA.radius && cA.radius > cB.radius * 1.2) {
             cA.mass += cB.mass;
             cA.radius = cA.mass;
-            
+
             pA.cellsEaten++;
 
-            if (pB.cells.length === 1) {
+            // 1. Marcamos la célula como muerta
+            cB.mass = 0;
+            cB.radius = 0;
+
+            // 2. Contamos cuántas células VIVAS le quedan realmente a pB
+            const livingCells = pB.cells.filter(c => c.mass > 0).length;
+
+            // 3. Si no le quedan células vivas (0), Game Over
+            if (livingCells === 0) {
               const timeAlive = Date.now() - pB.startTime;
               const randomPhrase = DEATH_PHRASES[Math.floor(Math.random() * DEATH_PHRASES.length)];
-              
+
               const deathData = {
-                  killerName: pA.nickname,
-                  killerSkin: pA.skin,
-                  killerCustomSkin: pA.customSkin,
-                  killerColor: pA.color,
-                  killerId: pA.id, 
-                  message: randomPhrase,
-                  stats: {
-                      finalMass: Math.floor(cB.mass),
-                      maxMass: pB.maxMass,
-                      timeAlive: timeAlive,
-                      cellsEaten: pB.cellsEaten,
-                      bestRank: pB.bestRank
-                  }
+                killerName: pA.nickname,
+                killerSkin: pA.skin,
+                killerCustomSkin: pA.customSkin,
+                killerColor: pA.color,
+                killerId: pA.id,
+                message: randomPhrase,
+                stats: {
+                  finalMass: Math.floor(cB.mass),
+                  maxMass: pB.maxMass,
+                  timeAlive: timeAlive,
+                  cellsEaten: pB.cellsEaten,
+                  bestRank: pB.bestRank
+                }
               };
 
               io.to(pB.id).emit('gameOver', deathData);
               pB.playing = false;
             }
-            cB.mass = 0;
-            cB.radius = 0;
           }
         }
         pB.cells = pB.cells.filter(c => c.mass > 0);
@@ -402,9 +540,7 @@ setInterval(() => {
     }
   }
 
-  // --- OPTIMIZACIÓN 2: VIEW CULLING (RECORTE DE VISIÓN) ---
-  
-  // 1. Preparamos los jugadores reducidos (con redondeo) para no recalcularlos N veces
+  // --- OPTIMIZACIÓN 2: VIEW CULLING ---
   const reducedPlayers = {};
   for (let id in players) {
     const p = players[id];
@@ -417,7 +553,7 @@ setInterval(() => {
         customSkin: p.customSkin,
         cells: p.cells.map(c => ({
           id: c.id,
-          x: Math.round(c.x), // Redondear coordenadas
+          x: Math.round(c.x),
           y: Math.round(c.y),
           radius: Math.round(c.radius)
         }))
@@ -425,90 +561,77 @@ setInterval(() => {
     }
   }
 
-  // 2. Obtenemos todos los sockets conectados
   const connectedSockets = io.sockets.sockets;
 
-  // 3. Iteramos sobre cada cliente conectado
   for (const [socketId, socket] of connectedSockets) {
     const p = players[socketId];
-    
-    // Variables para definir el área de visión
+
     let viewX = MAP_WIDTH / 2;
     let viewY = MAP_HEIGHT / 2;
-    let viewDist = 1500; // Vista base bastante amplia
+    let viewDist = 1500;
 
-    // Si el jugador está jugando, centramos la cámara en sus células
     if (p && p.playing && p.cells.length > 0) {
-        let totalX = 0, totalY = 0, totalMass = 0;
-        p.cells.forEach(c => {
-            totalX += c.x;
-            totalY += c.y;
-            totalMass += c.mass;
-        });
-        viewX = totalX / p.cells.length;
-        viewY = totalY / p.cells.length;
-        
-        // Aumentar el rango de visión si el jugador es grande (Zoom out)
-        viewDist += Math.sqrt(totalMass) * 2; 
+      let totalX = 0, totalY = 0, totalMass = 0;
+      p.cells.forEach(c => {
+        totalX += c.x;
+        totalY += c.y;
+        totalMass += c.mass;
+      });
+      viewX = totalX / p.cells.length;
+      viewY = totalY / p.cells.length;
+      viewDist += Math.sqrt(totalMass) * 2;
     }
-    
-    // --- FILTRADO (CULLING) ---
-    
-    // Filtrar COMIDA visible (con redondeo)
-    const visibleFood = food.filter(f => 
-        Math.abs(f.x - viewX) < viewDist && 
-        Math.abs(f.y - viewY) < viewDist
+
+    // Filtrado
+    const visibleFood = food.filter(f =>
+      Math.abs(f.x - viewX) < viewDist &&
+      Math.abs(f.y - viewY) < viewDist
     ).map(f => ({
-        x: Math.round(f.x),
-        y: Math.round(f.y),
-        color: f.color
+      x: Math.round(f.x),
+      y: Math.round(f.y),
+      color: f.color
     }));
 
-    // Filtrar VIRUS visibles (con redondeo)
-    const visibleViruses = viruses.filter(v => 
-        Math.abs(v.x - viewX) < viewDist && 
-        Math.abs(v.y - viewY) < viewDist
+    const visibleViruses = viruses.filter(v =>
+      Math.abs(v.x - viewX) < viewDist &&
+      Math.abs(v.y - viewY) < viewDist
     ).map(v => ({
-        id: v.id,
-        x: Math.round(v.x),
-        y: Math.round(v.y),
-        radius: Math.round(v.radius)
+      id: v.id,
+      x: Math.round(v.x),
+      y: Math.round(v.y),
+      radius: Math.round(v.radius)
     }));
 
-    // Filtrar MASA EYECTADA visible (con redondeo)
-    const visibleEjected = ejectedMass.filter(em => 
-        Math.abs(em.x - viewX) < viewDist && 
-        Math.abs(em.y - viewY) < viewDist
+    const visibleEjected = ejectedMass.filter(em =>
+      Math.abs(em.x - viewX) < viewDist &&
+      Math.abs(em.y - viewY) < viewDist
     ).map(em => ({
-        id: em.id,
-        x: Math.round(em.x),
-        y: Math.round(em.y),
-        radius: Math.round(em.radius),
-        color: em.color
+      id: em.id,
+      x: Math.round(em.x),
+      y: Math.round(em.y),
+      radius: Math.round(em.radius),
+      color: em.color
     }));
 
-    // Filtrar JUGADORES visibles
     const visiblePlayers = {};
     for (let pid in reducedPlayers) {
-        const rp = reducedPlayers[pid];
-        // Comprobamos si ALGUNA célula del jugador rival es visible
-        const isVisible = rp.cells.some(c => 
-            Math.abs(c.x - viewX) < viewDist + 500 && // Buffer extra para jugadores
-            Math.abs(c.y - viewY) < viewDist + 500
-        );
-        
-        if (isVisible) {
-            visiblePlayers[pid] = rp;
-        }
+      const rp = reducedPlayers[pid];
+      const isVisible = rp.cells.some(c =>
+        Math.abs(c.x - viewX) < viewDist + 500 &&
+        Math.abs(c.y - viewY) < viewDist + 500
+      );
+
+      if (isVisible) {
+        visiblePlayers[pid] = rp;
+      }
     }
 
-    // Enviamos el paquete personalizado SOLO a este socket
-    socket.emit('stateUpdate', { 
-        players: visiblePlayers, 
-        food: visibleFood, 
-        ejectedMass: visibleEjected, 
-        viruses: visibleViruses, 
-        leaderboard: leaderboard.slice(0, 10) 
+    socket.emit('stateUpdate', {
+      players: visiblePlayers,
+      food: visibleFood,
+      ejectedMass: visibleEjected,
+      viruses: visibleViruses,
+      leaderboard: leaderboard.slice(0, 10)
     });
   }
 

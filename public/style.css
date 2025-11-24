@@ -42,10 +42,8 @@ canvas {
 #login-screen,
 #game-over-screen {
     position: relative;
-    /* Fondo con blur (efecto cristal esmerilado) */
     background: rgba(20, 20, 25, 0.85);
     backdrop-filter: blur(15px);
-    /* BLUR FUERTE */
     border: 1px solid rgba(255, 255, 255, 0.1);
     padding: 25px;
     border-radius: 16px;
@@ -55,8 +53,6 @@ canvas {
     width: 360px;
     max-width: 90%;
     height: auto;
-
-    /* Aplicar animación */
     animation: popIn 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
 }
 
@@ -143,12 +139,8 @@ select:focus {
 /* --- COLOR PICKER REDONDO --- */
 input[type="color"] {
     -webkit-appearance: none;
-    /* Para Chrome, Safari, Edge */
     -moz-appearance: none;
-    /* Para Firefox */
     appearance: none;
-    /* Estándar oficial */
-
     border: none;
     width: 38px;
     height: 38px;
@@ -269,7 +261,6 @@ button:active {
 
 /* --- ESTILOS ESPECÍFICOS GAME OVER --- */
 
-/* Info del Asesino */
 .killer-info {
     display: flex;
     align-items: center;
@@ -298,8 +289,6 @@ button:active {
 #killer-color-circle {
     background-color: #fff;
 }
-
-/* Fallback si no hay imagen */
 
 .killer-text {
     text-align: left;
@@ -347,7 +336,7 @@ button:active {
     font-family: 'Segoe UI', sans-serif;
 }
 
-/* Leaderboard Position */
+/* --- CAMBIOS AQUÍ: LEADERBOARD MÁS GRANDE --- */
 #leaderboard {
     position: absolute;
     top: 10px;
@@ -355,56 +344,378 @@ button:active {
     background: rgba(0, 0, 0, 0.5);
     padding: 10px;
     border-radius: 6px;
-    width: 160px;
+    width: 180px;
+    /* Un poco más ancho */
     pointer-events: none;
     z-index: 20;
 }
 
 #leaderboard h3 {
-    font-size: 11px;
+    font-size: 18px;
+    /* Era 11px */
     color: #4CAF50;
-    margin-bottom: 5px;
+    margin-bottom: 8px;
     text-align: center;
 }
 
 #leaderboard-list li {
-    font-size: 10px;
+    font-size: 14px;
+    /* Era 10px */
     display: flex;
     justify-content: space-between;
-    margin-bottom: 2px;
+    margin-bottom: 4px;
+    font-weight: 500;
 }
 
-/* ... (Resto de tu CSS anterior) ... */
+/* --- NUEVOS ESTILOS PARA BOTONES DE NAVEGACIÓN --- */
 
-/* BOTÓN SALIR DE ESPECTADOR */
-#exit-spectate-btn {
+.action-buttons-container {
+    display: flex;
+    gap: 10px;
+    margin-bottom: 10px;
+}
+
+/* Panel de Controles de Espectador */
+#spectator-controls {
     position: absolute;
     bottom: 30px;
     left: 50%;
     transform: translateX(-50%);
-    width: auto;
-    /* Ancho automático según el texto */
-    padding: 12px 25px;
-    background: #ff4444;
-    /* Rojo llamativo */
-    color: white;
-    font-size: 14px;
-    font-weight: bold;
-    border-radius: 30px;
-    /* Redondeado */
-    box-shadow: 0 5px 15px rgba(0, 0, 0, 0.5);
+    display: flex;
+    gap: 15px;
+    background: rgba(0, 0, 0, 0.6);
+    padding: 10px 20px;
+    border-radius: 50px;
+    border: 1px solid rgba(255, 255, 255, 0.2);
     z-index: 20;
-    /* Por encima del canvas */
+    backdrop-filter: blur(5px);
+}
+
+.spec-btn {
+    background: transparent;
+    border: 2px solid rgba(255, 255, 255, 0.3);
+    color: white;
+    padding: 8px 16px;
+    font-size: 12px;
+    border-radius: 20px;
     cursor: pointer;
     transition: all 0.2s;
-    border: 2px solid rgba(255, 255, 255, 0.2);
+    width: auto;
+    margin: 0;
+    box-shadow: none;
 }
 
-#exit-spectate-btn:hover {
-    background: #ff2222;
-    transform: translateX(-50%) scale(1.05);
+.spec-btn:hover {
+    background: rgba(255, 255, 255, 0.1);
+    border-color: white;
 }
 
-#exit-spectate-btn:active {
-    transform: translateX(-50%) scale(0.95);
+.spec-btn.highlight {
+    background: #4CAF50;
+    border-color: #4CAF50;
+    font-weight: bold;
+}
+
+.spec-btn.highlight:hover {
+    background: #45a049;
+}
+
+@media (max-width: 600px) {
+    #spectator-controls {
+        width: 90%;
+        justify-content: center;
+        bottom: 80px;
+    }
+
+    .spec-btn {
+        padding: 8px 10px;
+        font-size: 11px;
+    }
+}
+
+/* --- SALA DE ESPERA --- */
+#lobby-screen {
+    position: relative;
+    background: rgba(20, 20, 25, 0.95);
+    backdrop-filter: blur(10px);
+    border: 1px solid #444;
+    padding: 40px;
+    border-radius: 16px;
+    text-align: center;
+    box-shadow: 0 0 50px rgba(0, 0, 0, 0.8);
+    z-index: 15;
+    width: 400px;
+    color: white;
+}
+
+#player-count {
+    font-size: 48px;
+    font-weight: bold;
+    color: #4CAF50;
+    margin: 20px 0;
+    text-shadow: 0 0 10px rgba(76, 175, 80, 0.5);
+}
+
+/* Un spinner de carga simple */
+.loader {
+    border: 5px solid #333;
+    border-top: 5px solid #4CAF50;
+    border-radius: 50%;
+    width: 40px;
+    height: 40px;
+    animation: spin 1s linear infinite;
+    margin: 0 auto;
+}
+
+@keyframes spin {
+    0% {
+        transform: rotate(0deg);
+    }
+
+    100% {
+        transform: rotate(360deg);
+    }
+}
+
+/* --- LISTA DE JUGADORES EN EL LOBBY (MEJORADA) --- */
+#lobby-player-list {
+    list-style: none;
+    padding: 5px;
+    margin: 20px auto;
+    width: 100%;
+    max-height: 220px;
+    overflow-y: auto;
+    text-align: left;
+    /* Quitamos el borde simple de arriba */
+    border-top: none;
+    /* Añadimos un scrollbar personalizado para Webkit (Chrome/Edge) */
+    scrollbar-width: thin;
+    scrollbar-color: #4CAF50 #222;
+}
+
+/* Scrollbar personalizado */
+#lobby-player-list::-webkit-scrollbar {
+    width: 6px;
+}
+
+#lobby-player-list::-webkit-scrollbar-track {
+    background: rgba(0, 0, 0, 0.3);
+    border-radius: 3px;
+}
+
+#lobby-player-list::-webkit-scrollbar-thumb {
+    background-color: #4CAF50;
+    border-radius: 3px;
+}
+
+/* Estilo de cada jugador (Tarjeta) */
+#lobby-player-list li {
+    position: relative;
+    padding: 10px 15px;
+    margin-bottom: 8px;
+    /* Separación entre jugadores */
+    background: linear-gradient(90deg, rgba(76, 175, 80, 0.1) 0%, rgba(255, 255, 255, 0.05) 100%);
+    font-size: 15px;
+    font-weight: 600;
+    color: #fff;
+    border-radius: 4px;
+    border-left: 4px solid #4CAF50;
+    /* Barra de neón verde a la izquierda */
+    box-shadow: 0 2px 5px rgba(0, 0, 0, 0.2);
+    transition: transform 0.2s, background 0.2s;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+/* Efecto Hover (al pasar el mouse por encima) */
+#lobby-player-list li:hover {
+    background: linear-gradient(90deg, rgba(76, 175, 80, 0.2) 0%, rgba(255, 255, 255, 0.1) 100%);
+    transform: translateX(5px);
+    /* Se mueve un poco a la derecha */
+}
+
+/* Animación de entrada suave para los nombres */
+@keyframes slideIn {
+    from {
+        opacity: 0;
+        transform: translateX(-10px);
+    }
+
+    to {
+        opacity: 1;
+        transform: translateX(0);
+    }
+}
+
+#lobby-player-list li {
+    animation: slideIn 0.3s ease-out forwards;
+}
+
+/* --- CUENTA REGRESIVA GIGANTE (MANTENIDA PERO PULIDA) --- */
+#countdown-overlay {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0, 0, 0, 0.85);
+    /* Un poco más oscuro */
+    backdrop-filter: blur(5px);
+    /* Efecto borroso al fondo */
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    z-index: 100;
+    border-radius: 16px;
+    /* Para que respete los bordes redondeados si el contenedor los tiene */
+}
+
+#countdown-number {
+    font-size: 180px;
+    font-weight: 900;
+
+    /* Gradiente de fondo */
+    background: -webkit-linear-gradient(#FF5722, #FFC107);
+
+    /* SOLUCIÓN: Agrega esta línea estándar */
+    background-clip: text;
+
+    /* Mantén esta línea para compatibilidad (Chrome, Safari, Edge) */
+    -webkit-background-clip: text;
+
+    -webkit-text-fill-color: transparent;
+    text-shadow: 0 0 50px rgba(255, 87, 34, 0.5);
+
+    animation: zoomCount 1s infinite;
+}
+
+@keyframes zoomCount {
+    0% {
+        transform: scale(0.5);
+        opacity: 0;
+    }
+
+    40% {
+        transform: scale(1.1);
+        opacity: 1;
+    }
+
+    50% {
+        transform: scale(1.0);
+        opacity: 1;
+    }
+
+    90% {
+        transform: scale(1);
+        opacity: 1;
+    }
+
+    100% {
+        transform: scale(1.5);
+        opacity: 0;
+    }
+
+    /* Desvanece al final */
+}
+
+/* --- PANTALLA DE VICTORIA --- */
+#victory-screen {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(10, 10, 10, 0.95);
+    z-index: 200;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    animation: fadeIn 0.5s ease-out;
+}
+
+.trophy-icon {
+    font-size: 80px;
+    animation: bounce 2s infinite;
+}
+
+#winner-name {
+    font-size: 60px;
+    font-weight: 900;
+    color: #FFD700;
+    /* Dorado */
+    text-shadow: 0 0 20px rgba(255, 215, 0, 0.6);
+    margin: 10px 0;
+    text-transform: uppercase;
+}
+
+.winner-label {
+    font-size: 20px;
+    color: #fff;
+    letter-spacing: 5px;
+    margin-bottom: 30px;
+    opacity: 0.8;
+}
+
+.final-leaderboard-container {
+    background: rgba(255, 255, 255, 0.05);
+    padding: 20px;
+    border-radius: 12px;
+    border: 1px solid #333;
+    width: 350px;
+    text-align: center;
+}
+
+.final-leaderboard-container h3 {
+    color: #4CAF50;
+    border-bottom: 1px solid #444;
+    padding-bottom: 10px;
+    margin-bottom: 10px;
+}
+
+#final-leaderboard-list {
+    list-style: none;
+    padding: 0;
+    max-height: 200px;
+    overflow-y: auto;
+}
+
+#final-leaderboard-list li {
+    display: flex;
+    justify-content: space-between;
+    padding: 5px 10px;
+    font-size: 14px;
+    color: #ddd;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+.restart-timer {
+    margin-top: 30px;
+    font-size: 18px;
+    color: #888;
+}
+
+@keyframes bounce {
+
+    0%,
+    100% {
+        transform: translateY(0);
+    }
+
+    50% {
+        transform: translateY(-20px);
+    }
+}
+
+@keyframes fadeIn {
+    from {
+        opacity: 0;
+        transform: scale(0.9);
+    }
+
+    to {
+        opacity: 1;
+        transform: scale(1);
+    }
 }
