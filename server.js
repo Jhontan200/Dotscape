@@ -7,9 +7,9 @@ const io = new Server(server);
 
 const PORT = process.env.PORT || 3000;
 
-const WINNING_SCORE = 50; // Meta para ganar
+const WINNING_SCORE = 100; // Meta para ganar
 
-const MAX_PLAYERS = 2;
+const MAX_PLAYERS = 4;
 const MAP_WIDTH = 3000;
 const MAP_HEIGHT = 3000;
 
