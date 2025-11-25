@@ -1,4 +1,4 @@
-const socket = io('https://dotscape.onrender.com');
+const socket = io();
 
 // Elementos del DOM
 const pantallaInicioSesion = document.getElementById('login-screen');
