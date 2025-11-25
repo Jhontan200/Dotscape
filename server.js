@@ -7,7 +7,7 @@ const io = new Server(servidor);
 
 const PUERTO = process.env.PORT || 3000;
 
-const PUNTAJE_GANADOR = 50; // Meta para ganar
+const PUNTAJE_GANADOR = 500; // Meta para ganar
 
 const MAX_JUGADORES = 10;
 const ANCHO_MAPA = 3000;
