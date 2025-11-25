@@ -1,37 +1,37 @@
 const express = require('express');
 const app = express();
 const http = require('http');
-const server = http.createServer(app);
+const servidor = http.createServer(app);
 const { Server } = require("socket.io");
-const io = new Server(server);
+const io = new Server(servidor);
 
-const PORT = process.env.PORT || 3000;
+const PUERTO = process.env.PORT || 3000;
 
-const WINNING_SCORE = 100; // Meta para ganar
+const PUNTAJE_GANADOR = 50; // Meta para ganar
 
-const MAX_PLAYERS = 10;
-const MAP_WIDTH = 3000;
-const MAP_HEIGHT = 3000;
+const MAX_JUGADORES = 10;
+const ANCHO_MAPA = 3000;
+const ALTO_MAPA = 3000;
 
 // --- OPTIMIZACIÓN 1: BAJAR TICK RATE ---
-const TICK_RATE = 60;
+const TASA_ACTUALIZACION = 60;
 
-// --- CAMBIO AQUÍ: MÁS COMIDA ---
-const MAX_FOOD = 250;
-const BASE_SPEED = 8;
-const MAX_CELLS = 16;
-const MERGE_TIMER = 45000;
-const EJECT_MASS_GAIN = 15;
-const EJECT_MASS_LOSS = 18;
-const EJECT_SPEED = 28;
+// --- MÁS COMIDA ---
+const MAX_COMIDA = 250;
+const VELOCIDAD_BASE = 8;
+const MAX_CELULAS = 16;
+const TEMPORIZADOR_FUSION = 45000;
+const GANANCIA_MASA_EXPULSADA = 15;
+const PERDIDA_MASA_EXPULSADA = 18;
+const VELOCIDAD_EXPULSION = 28;
 
 // --- CONFIGURACIÓN VIRUS ---
-const MAX_VIRUSES = 15;
-const VIRUS_MASS = 60;
-const VIRUS_RADIUS = 60;
+const MAX_VIRUS = 15;
+const MASA_VIRUS = 60;
+const RADIO_VIRUS = 60;
 
 // --- FRASES DE MUERTE ALEATORIAS ---
-const DEATH_PHRASES = [
+const FRASES_MUERTE = [
   "ha cenado contigo",
   "te ha aplastado sin piedad",
   "te ha borrado del mapa",
@@ -42,64 +42,115 @@ const DEATH_PHRASES = [
 ];
 
 // --- ESTADOS DEL JUEGO ---
-const GAME_STATE = {
-  WAITING: 0,   // Sala de espera
-  nY_PLAYING: 1, // Juego en curso
-  ENDED: 2      // Juego terminado (mostrando ganador)
+const ESTADO_JUEGO = {
+  ESPERANDO: 0,
+  JUGANDO: 1,
+  TERMINADO: 2
 };
 
-let food = [];
-let players = {};
-let ejectedMass = [];
-let viruses = [];
 
-let currentGameState = GAME_STATE.WAITING;
-let waitingPlayers = []; // Lista de sockets esperando
+// --- CONFIGURACIÓN DE SALA ---
+const LIMITE_MAXIMO_JUGADORES = 10;
+const MIN_JUGADORES_PARA_INICIAR = 3;
+const TIEMPO_ESPERA_INICIAL = 30;
+const TIEMPO_EXTENSION = 5;
 
-let uniqueCellIdCounter = 0;
-function getCellId() {
-  return uniqueCellIdCounter++;
+// Variables del Temporizador
+let temporizadorSala = null;
+let tiempoRestanteSala = 0;
+let estaTemporizadorCorriendo = false;
+
+let comida = [];
+let jugadores = {};
+let masaEyaculada = [];
+let virus = [];
+
+let estadoJuegoActual = ESTADO_JUEGO.ESPERANDO;
+let jugadoresEnEspera = [];
+
+let contadorIdCelulaUnica = 0;
+function obtenerIdCelula() {
+  return contadorIdCelulaUnica++;
 }
 
-function createFood() {
+function crearComida() {
   return {
-    x: Math.random() * MAP_WIDTH,
-    y: Math.random() * MAP_HEIGHT,
+    x: Math.random() * ANCHO_MAPA,
+    y: Math.random() * ALTO_MAPA,
     color: `hsl(${Math.random() * 360}, 100%, 50%)`
   };
 }
 
-function createVirus() {
+function crearVirus() {
   return {
-    id: getCellId(),
-    x: Math.random() * MAP_WIDTH,
-    y: Math.random() * MAP_HEIGHT,
-    radius: VIRUS_RADIUS,
-    mass: VIRUS_MASS
+    id: obtenerIdCelula(),
+    x: Math.random() * ANCHO_MAPA,
+    y: Math.random() * ALTO_MAPA,
+    radius: RADIO_VIRUS,
+    mass: MASA_VIRUS
   };
 }
 
 // Función auxiliar para enviar el estado del lobby a todos
-function broadcastLobbyUpdate() {
-  // Mapeamos los IDs de espera a sus Nombres reales
-  const namesList = waitingPlayers.map(id => {
-    return players[id] ? players[id].nickname : 'Desconocido';
+function transmitirActualizacionSala() {
+
+  const listaNombres = jugadoresEnEspera.map(id => {
+    return jugadores[id] ? jugadores[id].nickname : 'Desconocido';
   });
 
   io.emit('lobbyUpdate', {
-    count: waitingPlayers.length,
-    required: MAX_PLAYERS,
-    names: namesList // Enviamos la lista de nombres
+    count: jugadoresEnEspera.length,
+    required: MIN_JUGADORES_PARA_INICIAR,
+    names: listaNombres,
+    timerActive: estaTemporizadorCorriendo,
+    timeLeft: tiempoRestanteSala
   });
 }
 
-for (let i = 0; i < MAX_FOOD; i++) food.push(createFood());
-for (let i = 0; i < MAX_VIRUSES; i++) viruses.push(createVirus());
+for (let i = 0; i < MAX_COMIDA; i++) comida.push(crearComida());
+for (let i = 0; i < MAX_VIRUS; i++) virus.push(crearVirus());
 
 app.use(express.static('public'));
 
+// --- FUNCIÓN: LÓGICA DE EXPULSIÓN REUTILIZABLE ---
+/**
+ * Realiza la expulsión de masa para un jugador en la dirección del objetivo.
+ * @param {object} jugador El objeto del jugador.
+ * @param {number} objetivoX Coordenada X del punto de destino.
+ * @param {number} objetivoY Coordenada Y del punto de destino.
+ */
+function realizarExpulsion(jugador, objetivoX, objetivoY) {
+  if (!jugador || !jugador.playing) return;
+
+  jugador.cells.forEach(cell => {
+    if (cell.mass >= 35) {
+      cell.mass -= PERDIDA_MASA_EXPULSADA;
+      cell.radius = cell.mass;
+
+      // Usar objetivoX/objetivoY pasados como argumento para la dirección
+      const dx = objetivoX - cell.x;
+      const dy = objetivoY - cell.y;
+      const dist = Math.sqrt(dx * dx + dy * dy) || 1;
+      const dirX = dx / dist;
+      const dirY = dy / dist;
+
+      masaEyaculada.push({
+        id: obtenerIdCelula(),
+        x: cell.x + dirX * cell.radius,
+        y: cell.y + dirY * cell.radius,
+        radius: GANANCIA_MASA_EXPULSADA,
+        mass: GANANCIA_MASA_EXPULSADA,
+        color: jugador.color,
+        speedX: dirX * VELOCIDAD_EXPULSION,
+        speedY: dirY * VELOCIDAD_EXPULSION,
+        creationTime: Date.now()
+      });
+    }
+  });
+}
+
 io.on('connection', (socket) => {
-  if (Object.keys(players).length >= MAX_PLAYERS) {
+  if (Object.keys(jugadores).length >= LIMITE_MAXIMO_JUGADORES) {
     socket.emit('serverFull', 'Servidor lleno.');
     socket.disconnect(true);
     return;
@@ -107,17 +158,18 @@ io.on('connection', (socket) => {
 
   console.log('🟢 Conectado:', socket.id);
 
-  players[socket.id] = {
+  jugadores[socket.id] = {
     id: socket.id,
     nickname: 'Guest',
     color: '#FFFFFF',
     skin: '',
     customSkin: null,
     playing: false,
+    canRejoin: false,
     targetX: 0,
     targetY: 0,
     cells: [],
-    // --- NUEVAS ESTADÍSTICAS ---
+    // --- ESTADÍSTICAS ---
     startTime: 0,
     maxMass: 0,
     cellsEaten: 0,
@@ -127,65 +179,94 @@ io.on('connection', (socket) => {
   socket.emit('playerInfo', socket.id);
 
   socket.on('startGame', (data) => {
-    // Solo permitimos unirse si estamos en modo ESPERA
-    if (currentGameState !== GAME_STATE.WAITING) {
-      socket.emit('serverFull', 'Partida en curso. Espera a que termine.');
+    // 0. Validar datos básicos
+    const nombre = data.nickname.trim().substring(0, 15);
+    if (!nombre) return;
+
+    const p = jugadores[socket.id];
+    if (!p) return;
+
+    // Actualizamos SIEMPRE los datos
+    p.nickname = nombre;
+    p.color = data.color;
+    p.skin = data.skin;
+    p.customSkin = data.customSkin;
+
+    // --- LÓGICA DE ESTADOS ---
+
+    // CASO A: Partida TERMINADA
+    if (estadoJuegoActual === ESTADO_JUEGO.TERMINADO) {
+      socket.emit('serverFull', 'La ronda terminó. Esperando reinicio...');
       return;
     }
 
-    // Validar nombre obligatorio (Requisito UI)
-    const name = data.nickname.trim().substring(0, 10);
-    if (!name) return; // Si no hay nombre, ignorar
+    // CASO B: Partida EN CURSO (JUGANDO)
+    if (estadoJuegoActual === ESTADO_JUEGO.JUGANDO) {
+      // ¿Este jugador tiene permiso para reingresar?
+      if (p.canRejoin) {
+        // Reingreso inmediato
+        p.playing = true;
+        p.startTime = Date.now();
+        p.cellsEaten = 0;
+        p.maxMass = 20;
+        p.cells = [{
+          id: obtenerIdCelula(),
+          x: Math.random() * ANCHO_MAPA,
+          y: Math.random() * ALTO_MAPA,
+          radius: 20,
+          mass: 20,
+          speedX: 0,
+          speedY: 0,
+          mergeTime: 0
+        }];
 
-    if (players[socket.id]) {
-      const p = players[socket.id];
-      p.nickname = name || 'Jugador';
-      p.color = data.color;
-      p.skin = data.skin;
-      p.customSkin = data.customSkin;
+        // Avisamos SOLO a este cliente que empiece a jugar
+        socket.emit('gameStarted');
+        return;
+      }
+      else {
+        // Es un jugador nuevo que llegó tarde
+        socket.emit('serverFull', 'Partida en curso. Espera a la siguiente ronda.');
+        return;
+      }
+    }
 
-      // IMPORTANTE: Aún NO está jugando (playing = false)
+    // CASO C: Estamos en SALA DE ESPERA
+    if (estadoJuegoActual === ESTADO_JUEGO.ESPERANDO) {
       p.playing = false;
-      p.isReady = true; // Nuevo flag para saber que está en sala de espera
+      p.isReady = true;
 
-      // Verificar si ya está en la lista de espera para no duplicar
-      if (!waitingPlayers.includes(socket.id)) {
-        waitingPlayers.push(socket.id);
+      if (!jugadoresEnEspera.includes(socket.id)) {
+        jugadoresEnEspera.push(socket.id);
+        // Si el reloj corría, extendemos tiempo
+        if (estaTemporizadorCorriendo) {
+          tiempoRestanteSala += TIEMPO_EXTENSION;
+          io.emit('timerExtended', TIEMPO_EXTENSION);
+        }
       }
 
       socket.emit('joinedLobby');
-      // 1. Enviamos la actualización con nombres
-      broadcastLobbyUpdate();
-
-      // 2. Comprobamos si llenamos la sala
-      if (waitingPlayers.length >= MAX_PLAYERS) {
-        // EN LUGAR DE startGameRound(), iniciamos la cuenta regresiva
-        console.log("Iniciando cuenta regresiva...");
-        io.emit('startCountdown', 3); // Avisamos a los clientes: "3 segundos"
-
-        // El servidor espera 3 segundos antes de crear las células
-        setTimeout(() => {
-          startGameRound();
-        }, 3000);
-      }
+      gestionarTemporizadorSala();
+      transmitirActualizacionSala();
     }
+
   });
 
   socket.on('input', (data) => {
-    if (players[socket.id] && players[socket.id].playing) {
-      players[socket.id].targetX = data.x;
-      players[socket.id].targetY = data.y;
+    if (jugadores[socket.id] && jugadores[socket.id].playing) {
+      jugadores[socket.id].targetX = data.x;
+      jugadores[socket.id].targetY = data.y;
     }
   });
 
   socket.on('split', () => {
-    const p = players[socket.id];
+    const p = jugadores[socket.id];
     if (!p || !p.playing) return;
     let newCells = [];
     p.cells.forEach(cell => {
-      if (cell.mass >= 35 && p.cells.length + newCells.length < MAX_CELLS) {
-        const splitMass = cell.mass / 2;
-        cell.mass = splitMass;
+      if (cell.mass >= 35 && p.cells.length + newCells.length < MAX_CELULAS) {
+        const masaDividida = cell.mass / 2;
+        cell.mass = masaDividida;
         cell.radius = cell.mass;
         const dx = p.targetX - cell.x;
         const dy = p.targetY - cell.y;
@@ -193,79 +274,93 @@ io.on('connection', (socket) => {
         const dirX = dx / dist;
         const dirY = dy / dist;
         newCells.push({
-          id: getCellId(),
+          id: obtenerIdCelula(),
           x: cell.x + dirX * cell.radius,
           y: cell.y + dirY * cell.radius,
-          radius: splitMass,
-          mass: splitMass,
+          radius: masaDividida,
+          mass: masaDividida,
           speedX: dirX * 25,
           speedY: dirY * 25,
-          mergeTime: Date.now() + MERGE_TIMER
+          mergeTime: Date.now() + TEMPORIZADOR_FUSION
         });
-        cell.mergeTime = Date.now() + MERGE_TIMER;
+        cell.mergeTime = Date.now() + TEMPORIZADOR_FUSION;
       }
     });
     p.cells = p.cells.concat(newCells);
   });
 
+  // Handler de EXPULSAR
   socket.on('eject', () => {
-    const p = players[socket.id];
+    const p = jugadores[socket.id];
     if (!p || !p.playing) return;
-    p.cells.forEach(cell => {
-      if (cell.mass >= 35) {
-        cell.mass -= EJECT_MASS_LOSS;
-        cell.radius = cell.mass;
-        const dx = p.targetX - cell.x;
-        const dy = p.targetY - cell.y;
-        const dist = Math.sqrt(dx * dx + dy * dy) || 1;
-        const dirX = dx / dist;
-        const dirY = dy / dist;
-        ejectedMass.push({
-          id: getCellId(),
-          x: cell.x + dirX * cell.radius,
-          y: cell.y + dirY * cell.radius,
-          radius: EJECT_MASS_GAIN,
-          mass: EJECT_MASS_GAIN,
-          color: p.color,
-          speedX: dirX * EJECT_SPEED,
-          speedY: dirY * EJECT_SPEED,
-          creationTime: Date.now()
-        });
-      }
-    });
+
+    realizarExpulsion(p, p.targetX, p.targetY);
+  });
+
+  // --- NUEVO HANDLER: EXPULSIÓN ALEATORIA ---
+  socket.on('ejectRandom', () => {
+    const p = jugadores[socket.id];
+    if (!p || !p.playing || p.cells.length === 0) return;
+
+    // 1. Calcular el centroide del jugador (punto de origen)
+    let centroX = 0, centroY = 0;
+    p.cells.forEach(c => { centroX += c.x; centroY += c.y; });
+    centroX /= p.cells.length;
+    centroY /= p.cells.length;
+
+    // 2. Generar un ángulo aleatorio (0 a 2π)
+    const anguloAleatorio = Math.random() * 2 * Math.PI;
+
+    // 3. Crear un punto de destino muy lejano
+    const escalaMovimiento = 2000;
+    const objetivoX = centroX + Math.cos(anguloAleatorio) * escalaMovimiento;
+    const objetivoY = centroY + Math.sin(anguloAleatorio) * escalaMovimiento;
+
+    // 4. Llamar a la lógica de expulsión con el destino aleatorio
+    realizarExpulsion(p, objetivoX, objetivoY);
   });
 
   socket.on('disconnect', () => {
-    delete players[socket.id];
+    delete jugadores[socket.id];
+    const index = jugadoresEnEspera.indexOf(socket.id);
 
-    // Si estaba esperando, lo sacamos de la lista
-    const index = waitingPlayers.indexOf(socket.id);
     if (index !== -1) {
-      waitingPlayers.splice(index, 1);
-      if (currentGameState === GAME_STATE.WAITING) {
-        broadcastLobbyUpdate(); // Usamos la nueva función
+      jugadoresEnEspera.splice(index, 1);
+
+      // Cancelar reloj si somos menos del mínimo
+      if (estaTemporizadorCorriendo && jugadoresEnEspera.length < MIN_JUGADORES_PARA_INICIAR) {
+        console.log("🛑 Cancelando cuenta regresiva: Faltan jugadores.");
+        clearInterval(temporizadorSala);
+        estaTemporizadorCorriendo = false;
+        temporizadorSala = null;
+        tiempoRestanteSala = 0;
+      }
+
+      if (estadoJuegoActual === ESTADO_JUEGO.ESPERANDO) {
+        transmitirActualizacionSala();
       }
     }
   });
 });
 
-function startGameRound() {
-  console.log('🚀 INICIANDO RONDA CON 10 JUGADORES');
-  currentGameState = GAME_STATE.PLAYING;
+function iniciarRondaJuego() {
+  console.log('🚀 INICIANDO RONDA');
+  estadoJuegoActual = ESTADO_JUEGO.JUGANDO;
 
-  // Recorrer a los jugadores en espera y "spawnearlos"
-  waitingPlayers.forEach(socketId => {
-    const p = players[socketId];
+  // Spawnear jugadores en espera
+  jugadoresEnEspera.forEach(socketId => {
+    const p = jugadores[socketId];
     if (p) {
-      p.playing = true; // Ahora sí juegan
-      // Reiniciar estadísticas y posición
+      p.playing = true;
+      p.canRejoin = true;
+
       p.startTime = Date.now();
       p.maxMass = 20;
       p.cellsEaten = 0;
       p.cells = [{
-        id: getCellId(),
-        x: Math.random() * MAP_WIDTH,
-        y: Math.random() * MAP_HEIGHT,
+        id: obtenerIdCelula(),
+        x: Math.random() * ANCHO_MAPA,
+        y: Math.random() * ALTO_MAPA,
         radius: 20,
         mass: 20,
         speedX: 0,
@@ -279,52 +374,90 @@ function startGameRound() {
   io.emit('gameStarted');
 }
 
-function resetServer() {
+let temporizadorReiniciar = null;
+
+function reiniciarServidor() {
   console.log('🔄 REINICIANDO SERVIDOR PARA NUEVA RONDA...');
 
-  currentGameState = GAME_STATE.WAITING;
-  waitingPlayers = []; // Vaciamos la lista de espera
+  estadoJuegoActual = ESTADO_JUEGO.ESPERANDO;
+  jugadoresEnEspera = [];
 
   // Limpiamos el mapa
-  food = [];
-  ejectedMass = [];
-  viruses = [];
-  for (let i = 0; i < MAX_FOOD; i++) food.push(createFood());
-  for (let i = 0; i < MAX_VIRUSES; i++) viruses.push(createVirus());
+  comida = [];
+  masaEyaculada = [];
+  virus = [];
+  for (let i = 0; i < MAX_COMIDA; i++) comida.push(crearComida());
+  for (let i = 0; i < MAX_VIRUS; i++) virus.push(crearVirus());
 
   // Reseteamos a los jugadores conectados
-  for (const id in players) {
-    const p = players[id];
-    if (!p.playing || currentGameState === GAME_STATE.ENDED) continue;
+  for (const id in jugadores) {
+    const p = jugadores[id];
+    if (!p) continue;
 
     p.playing = false;
+    p.canRejoin = false; // Ya no pueden reingresar a la ronda anterior
     p.cells = [];
-    p.nickname = 'Guest'; // Borramos el nombre para obligar a ponerlo de nuevo
-    // IMPORTANTE: No los desconectamos del socket, solo del juego lógico
+    p.nickname = 'Guest';
+    // Restablecer estadísticas
+    p.startTime = 0;
+    p.maxMass = 0;
+    p.cellsEaten = 0;
+    p.bestRank = 999;
   }
 
-  // Avisamos a todos los clientes que vuelvan al menú
   io.emit('serverReset');
 }
 
-setInterval(() => {
-  const now = Date.now();
+function gestionarTemporizadorSala() {
+  // CASO 1: Arrancar el reloj si no está corriendo y cumplimos el mínimo
+  if (!estaTemporizadorCorriendo && jugadoresEnEspera.length >= MIN_JUGADORES_PARA_INICIAR) {
+    console.log("⏳ Iniciando cuenta regresiva del lobby...");
+    estaTemporizadorCorriendo = true;
+    tiempoRestanteSala = TIEMPO_ESPERA_INICIAL;
 
-  // Ejected Mass Physics
-  for (let i = ejectedMass.length - 1; i >= 0; i--) {
-    const em = ejectedMass[i];
+    // Intervalo de 1 segundo
+    temporizadorSala = setInterval(() => {
+      tiempoRestanteSala--;
+
+      // Avisar a los clientes del nuevo tiempo
+      transmitirActualizacionSala();
+
+      // Si llega a 0, INICIAMOS EL JUEGO
+      if (tiempoRestanteSala <= 0) {
+        clearInterval(temporizadorSala);
+        estaTemporizadorCorriendo = false;
+        temporizadorSala = null;
+        iniciarRondaJuego();
+      }
+    }, 1000);
+  }
+  // CASO 2: Extender tiempo si ya está corriendo
+  else if (estaTemporizadorCorriendo && jugadoresEnEspera.length > MIN_JUGADORES_PARA_INICIAR) {
+    tiempoRestanteSala += TIEMPO_EXTENSION;
+    if (tiempoRestanteSala > 60) tiempoRestanteSala = 60;
+
+    transmitirActualizacionSala();
+  }
+}
+
+setInterval(() => {
+  const ahora = Date.now();
+
+  // Física de Masa Expulsada
+  for (let i = masaEyaculada.length - 1; i >= 0; i--) {
+    const em = masaEyaculada[i];
     em.x += em.speedX;
     em.y += em.speedY;
     em.speedX *= 0.9;
     em.speedY *= 0.9;
-    if (em.x < 0 || em.x > MAP_WIDTH || em.y < 0 || em.y > MAP_HEIGHT) {
-      ejectedMass.splice(i, 1);
+    if (em.x < 0 || em.x > ANCHO_MAPA || em.y < 0 || em.y > ALTO_MAPA) {
+      masaEyaculada.splice(i, 1);
       continue;
     }
   }
 
-  // --- CALCULAR LEADERBOARD PRIMERO ---
-  const leaderboard = Object.values(players)
+  // Calcular Clasificación
+  const clasificacion = Object.values(jugadores)
     .filter(p => p.playing)
     .map(p => ({
       id: p.id,
@@ -334,113 +467,123 @@ setInterval(() => {
     }))
     .sort((a, b) => b.score - a.score);
 
-  // LOGICA JUGADORES (FÍSICA, MOVIMIENTO, INTERACCIONES)
-  for (const id in players) {
-    const p = players[id];
+  // LOGICA JUGADORES
+  for (const id in jugadores) {
+    const p = jugadores[id];
     if (!p.playing) continue;
 
-    // 1. ACTUALIZAR ESTADÍSTICAS
     // 1. ACTUALIZAR ESTADÍSTICAS Y VERIFICAR VICTORIA
-    const currentTotalMass = Math.floor(p.cells.reduce((acc, c) => acc + c.mass, 0));
-    if (currentTotalMass > p.maxMass) p.maxMass = currentTotalMass;
+    const masaTotalActual = Math.floor(p.cells.reduce((acc, c) => acc + c.mass, 0));
+    if (masaTotalActual > p.maxMass) p.maxMass = masaTotalActual;
 
     // --- CONDICIÓN DE VICTORIA ---
-    if (currentGameState === GAME_STATE.PLAYING && currentTotalMass >= WINNING_SCORE) {
-      currentGameState = GAME_STATE.ENDED; // Congelar lógica del juego
+    if (estadoJuegoActual === ESTADO_JUEGO.JUGANDO && masaTotalActual >= PUNTAJE_GANADOR) {
+      estadoJuegoActual = ESTADO_JUEGO.TERMINADO;
 
-      console.log(`🏆 GANADOR: ${p.nickname} con ${currentTotalMass} puntos`);
+      console.log(`🏆 GANADOR: ${p.nickname} con ${masaTotalActual} puntos`);
 
-      // Enviamos el evento de victoria a TODOS
+      // Generar una lista final que incluya a TODOS
+      const clasificacionFinal = Object.values(jugadores)
+        .filter(player => player.playing || player.canRejoin)
+        .map(player => ({
+          id: player.id,
+          name: player.nickname,
+          score: Math.floor(player.cells.reduce((acc, c) => acc + c.mass, 0)),
+          color: player.color
+        }))
+        .sort((a, b) => b.score - a.score);
+
+      // Enviamos el evento de victoria a TODOS con la lista final
       io.emit('roundWon', {
         winnerName: p.nickname,
-        leaderboard: leaderboard.slice(0, 10) // Enviamos el top 10 final
+        leaderboard: clasificacionFinal.slice(0, 10)
       });
 
       // Temporizador de 10 segundos para reiniciar
-      setTimeout(() => {
-        resetServer();
+      temporizadorReiniciar = setTimeout(() => {
+        reiniciarServidor();
       }, 10000);
     }
 
     // Buscar mi posición en el ranking
-    const myRank = leaderboard.findIndex(l => l.id === p.id) + 1;
-    if (myRank > 0 && myRank < p.bestRank) p.bestRank = myRank;
+    const miRango = clasificacion.findIndex(l => l.id === p.id) + 1;
+    if (miRango > 0 && miRango < p.bestRank) p.bestRank = miRango;
 
-    let virusExplosionCells = [];
+    let celulasExplosionVirus = [];
 
     p.cells.forEach(cell => {
       // Movimiento
       const dx = p.targetX - cell.x;
       const dy = p.targetY - cell.y;
       const dist = Math.sqrt(dx * dx + dy * dy);
-      const speed = Math.max(BASE_SPEED - (cell.radius / 20), 2);
+      const velocidad = Math.max(VELOCIDAD_BASE - (cell.radius / 20), 2);
       if (dist > 5) {
         const angle = Math.atan2(dy, dx);
-        cell.x += Math.cos(angle) * speed;
-        cell.y += Math.sin(angle) * speed;
+        cell.x += Math.cos(angle) * velocidad;
+        cell.y += Math.sin(angle) * velocidad;
       }
       cell.x += cell.speedX;
       cell.y += cell.speedY;
       cell.speedX *= 0.9;
       cell.speedY *= 0.9;
 
-      const wallForce = 0.8;
-      if (cell.x < cell.radius) cell.speedX += wallForce;
-      if (cell.x > MAP_WIDTH - cell.radius) cell.speedX -= wallForce;
-      if (cell.y < cell.radius) cell.speedY += wallForce;
-      if (cell.y > MAP_HEIGHT - cell.radius) cell.speedY -= wallForce;
-      cell.x = Math.max(0, Math.min(MAP_WIDTH, cell.x));
-      cell.y = Math.max(0, Math.min(MAP_HEIGHT, cell.y));
+      const fuerzaMuro = 0.8;
+      if (cell.x < cell.radius) cell.speedX += fuerzaMuro;
+      if (cell.x > ANCHO_MAPA - cell.radius) cell.speedX -= fuerzaMuro;
+      if (cell.y < cell.radius) cell.speedY += fuerzaMuro;
+      if (cell.y > ALTO_MAPA - cell.radius) cell.speedY -= fuerzaMuro;
+      cell.x = Math.max(0, Math.min(ANCHO_MAPA, cell.x));
+      cell.y = Math.max(0, Math.min(ALTO_MAPA, cell.y));
 
       // COMER COMIDA
-      for (let i = food.length - 1; i >= 0; i--) {
-        const f = food[i];
+      for (let i = comida.length - 1; i >= 0; i--) {
+        const f = comida[i];
         if (Math.sqrt((cell.x - f.x) ** 2 + (cell.y - f.y) ** 2) < cell.radius) {
           cell.mass += 0.5;
           cell.radius = cell.mass;
           p.cellsEaten++;
-          food.splice(i, 1);
+          comida.splice(i, 1);
         }
       }
 
-      // COMER MASA
-      for (let i = ejectedMass.length - 1; i >= 0; i--) {
-        const em = ejectedMass[i];
+      // COMER MASA EXPULSADA
+      for (let i = masaEyaculada.length - 1; i >= 0; i--) {
+        const em = masaEyaculada[i];
         if (Math.sqrt((cell.x - em.x) ** 2 + (cell.y - em.y) ** 2) < cell.radius) {
           cell.mass += em.mass;
           cell.radius = cell.mass;
-          ejectedMass.splice(i, 1);
+          masaEyaculada.splice(i, 1);
         }
       }
 
       // VIRUS
-      for (let vIndex = viruses.length - 1; vIndex >= 0; vIndex--) {
-        const v = viruses[vIndex];
+      for (let vIndex = virus.length - 1; vIndex >= 0; vIndex--) {
+        const v = virus[vIndex];
         const distV = Math.sqrt((cell.x - v.x) ** 2 + (cell.y - v.y) ** 2);
         if (distV < cell.radius + v.radius) {
-          if (cell.mass < VIRUS_MASS) {
+          if (cell.mass < MASA_VIRUS) {
             continue;
           } else {
-            viruses.splice(vIndex, 1);
-            viruses.push(createVirus());
-            const maxSplits = MAX_CELLS - (p.cells.length + virusExplosionCells.length);
+            virus.splice(vIndex, 1);
+            virus.push(crearVirus());
+            const maxSplits = MAX_CELULAS - (p.cells.length + celulasExplosionVirus.length);
             if (maxSplits > 0) {
-              const pieces = Math.min(maxSplits, 8);
-              const massPerPiece = cell.mass / (pieces + 1);
-              cell.mass = massPerPiece;
-              cell.radius = massPerPiece;
-              cell.mergeTime = Date.now() + MERGE_TIMER;
-              for (let k = 0; k < pieces; k++) {
-                const angle = (k / pieces) * Math.PI * 2;
-                virusExplosionCells.push({
-                  id: getCellId(),
+              const piezas = Math.min(maxSplits, 8);
+              const masaPorPieza = cell.mass / (piezas + 1);
+              cell.mass = masaPorPieza;
+              cell.radius = masaPorPieza;
+              cell.mergeTime = Date.now() + TEMPORIZADOR_FUSION;
+              for (let k = 0; k < piezas; k++) {
+                const angle = (k / piezas) * Math.PI * 2;
+                celulasExplosionVirus.push({
+                  id: obtenerIdCelula(),
                   x: cell.x,
                   y: cell.y,
-                  radius: massPerPiece,
-                  mass: massPerPiece,
+                  radius: masaPorPieza,
+                  mass: masaPorPieza,
                   speedX: Math.cos(angle) * 20,
                   speedY: Math.sin(angle) * 20,
-                  mergeTime: Date.now() + MERGE_TIMER
+                  mergeTime: Date.now() + TEMPORIZADOR_FUSION
                 });
               }
             }
@@ -448,9 +591,9 @@ setInterval(() => {
         }
       }
     });
-    p.cells = p.cells.concat(virusExplosionCells);
+    p.cells = p.cells.concat(celulasExplosionVirus);
 
-    // FÍSICA INTERNA
+    // FÍSICA INTERNA (Fusión y Separación)
     for (let i = 0; i < p.cells.length; i++) {
       for (let j = i + 1; j < p.cells.length; j++) {
         const c1 = p.cells[i];
@@ -460,24 +603,24 @@ setInterval(() => {
         const dist = Math.sqrt(dx * dx + dy * dy);
         const minDist = c1.radius + c2.radius;
         if (dist < minDist) {
-          if (now > c1.mergeTime && now > c2.mergeTime) {
+          if (ahora > c1.mergeTime && ahora > c2.mergeTime) {
             c1.mass += c2.mass;
             c1.radius = c1.mass;
             c2.mass = 0;
             c2.radius = 0;
             continue;
           }
-          const penetration = minDist - dist;
-          if (penetration > 0 && dist > 0) {
+          const penetracion = minDist - dist;
+          if (penetracion > 0 && dist > 0) {
             const nx = dx / dist;
             const ny = dy / dist;
-            const totalMass = c1.mass + c2.mass;
-            const m1Factor = c2.mass / totalMass;
-            const m2Factor = c1.mass / totalMass;
-            c1.x += nx * penetration * m1Factor;
-            c1.y += ny * penetration * m1Factor;
-            c2.x -= nx * penetration * m2Factor;
-            c2.y -= ny * penetration * m2Factor;
+            const masaTotal = c1.mass + c2.mass;
+            const f1 = c2.mass / masaTotal;
+            const f2 = c1.mass / masaTotal;
+            c1.x += nx * penetracion * f1;
+            c1.y += ny * penetracion * f1;
+            c2.x -= nx * penetracion * f2;
+            c2.y -= ny * penetracion * f2;
           }
         }
       }
@@ -485,18 +628,20 @@ setInterval(() => {
     p.cells = p.cells.filter(c => c.mass > 0);
   }
 
-  while (food.length < MAX_FOOD) food.push(createFood());
-  while (viruses.length < MAX_VIRUSES) viruses.push(createVirus());
+  while (comida.length < MAX_COMIDA) comida.push(crearComida());
+  while (virus.length < MAX_VIRUS) virus.push(crearVirus());
 
-  // PvP & GAME OVER (CORREGIDO)
-  const allPlayers = Object.values(players).filter(p => p.playing);
-  for (const pA of allPlayers) {
-    for (const pB of allPlayers) {
+  // PvP & GAME OVER
+  const todosJugadores = Object.values(jugadores).filter(p => p.playing);
+  for (const pA of todosJugadores) {
+    for (const pB of todosJugadores) {
       if (pA.id === pB.id) continue;
       for (const cA of pA.cells) {
         for (const cB of pB.cells) {
           const dist = Math.sqrt((cA.x - cB.x) ** 2 + (cA.y - cB.y) ** 2);
           if (dist < cA.radius && cA.radius > cB.radius * 1.2) {
+            const masaAlMorir = cB.mass;
+
             cA.mass += cB.mass;
             cA.radius = cA.mass;
 
@@ -506,32 +651,33 @@ setInterval(() => {
             cB.mass = 0;
             cB.radius = 0;
 
-            // 2. Contamos cuántas células VIVAS le quedan realmente a pB
-            const livingCells = pB.cells.filter(c => c.mass > 0).length;
+            // 2. Contamos cuántas células VIVAS le quedan a pB
+            const celulasVivas = pB.cells.filter(c => c.mass > 0).length;
 
             // 3. Si no le quedan células vivas (0), Game Over
-            if (livingCells === 0) {
-              const timeAlive = Date.now() - pB.startTime;
-              const randomPhrase = DEATH_PHRASES[Math.floor(Math.random() * DEATH_PHRASES.length)];
+            if (celulasVivas === 0) {
+              const tiempoVivo = Date.now() - pB.startTime;
+              const fraseAleatoria = FRASES_MUERTE[Math.floor(Math.random() * FRASES_MUERTE.length)];
 
-              const deathData = {
+              const datosMuerte = {
                 killerName: pA.nickname,
                 killerSkin: pA.skin,
                 killerCustomSkin: pA.customSkin,
                 killerColor: pA.color,
                 killerId: pA.id,
-                message: randomPhrase,
+                message: fraseAleatoria,
                 stats: {
-                  finalMass: Math.floor(cB.mass),
+                  finalMass: Math.floor(masaAlMorir),
                   maxMass: pB.maxMass,
-                  timeAlive: timeAlive,
+                  timeAlive: tiempoVivo,
                   cellsEaten: pB.cellsEaten,
                   bestRank: pB.bestRank
                 }
               };
 
-              io.to(pB.id).emit('gameOver', deathData);
+              io.to(pB.id).emit('gameOver', datosMuerte);
               pB.playing = false;
+              pB.canRejoin = true; // Permitir reingreso inmediato si el juego sigue
             }
           }
         }
@@ -540,12 +686,12 @@ setInterval(() => {
     }
   }
 
-  // --- OPTIMIZACIÓN 2: VIEW CULLING ---
-  const reducedPlayers = {};
-  for (let id in players) {
-    const p = players[id];
+  // --- OPTIMIZACIÓN 2: FILTRADO DE VISTA (VIEW CULLING) ---
+  const jugadoresReducidos = {};
+  for (let id in jugadores) {
+    const p = jugadores[id];
     if (p.playing) {
-      reducedPlayers[id] = {
+      jugadoresReducidos[id] = {
         id: p.id,
         nickname: p.nickname,
         color: p.color,
@@ -561,40 +707,40 @@ setInterval(() => {
     }
   }
 
-  const connectedSockets = io.sockets.sockets;
+  const socketsConectados = io.sockets.sockets;
 
-  for (const [socketId, socket] of connectedSockets) {
-    const p = players[socketId];
+  for (const [socketId, socket] of socketsConectados) {
+    const p = jugadores[socketId];
 
-    let viewX = MAP_WIDTH / 2;
-    let viewY = MAP_HEIGHT / 2;
-    let viewDist = 1500;
+    let vistaX = ANCHO_MAPA / 2;
+    let vistaY = ALTO_MAPA / 2;
+    let distanciaVista = 1500;
 
     if (p && p.playing && p.cells.length > 0) {
-      let totalX = 0, totalY = 0, totalMass = 0;
+      let totalX = 0, totalY = 0, masaTotal = 0;
       p.cells.forEach(c => {
         totalX += c.x;
         totalY += c.y;
-        totalMass += c.mass;
+        masaTotal += c.mass;
       });
-      viewX = totalX / p.cells.length;
-      viewY = totalY / p.cells.length;
-      viewDist += Math.sqrt(totalMass) * 2;
+      vistaX = totalX / p.cells.length;
+      vistaY = totalY / p.cells.length;
+      distanciaVista += Math.sqrt(masaTotal) * 2;
     }
 
     // Filtrado
-    const visibleFood = food.filter(f =>
-      Math.abs(f.x - viewX) < viewDist &&
-      Math.abs(f.y - viewY) < viewDist
+    const comidaVisible = comida.filter(f =>
+      Math.abs(f.x - vistaX) < distanciaVista &&
+      Math.abs(f.y - vistaY) < distanciaVista
     ).map(f => ({
       x: Math.round(f.x),
       y: Math.round(f.y),
       color: f.color
     }));
 
-    const visibleViruses = viruses.filter(v =>
-      Math.abs(v.x - viewX) < viewDist &&
-      Math.abs(v.y - viewY) < viewDist
+    const virusVisible = virus.filter(v =>
+      Math.abs(v.x - vistaX) < distanciaVista &&
+      Math.abs(v.y - vistaY) < distanciaVista
     ).map(v => ({
       id: v.id,
       x: Math.round(v.x),
@@ -602,9 +748,9 @@ setInterval(() => {
       radius: Math.round(v.radius)
     }));
 
-    const visibleEjected = ejectedMass.filter(em =>
-      Math.abs(em.x - viewX) < viewDist &&
-      Math.abs(em.y - viewY) < viewDist
+    const masaEyaculadaVisible = masaEyaculada.filter(em =>
+      Math.abs(em.x - vistaX) < distanciaVista &&
+      Math.abs(em.y - vistaY) < distanciaVista
     ).map(em => ({
       id: em.id,
       x: Math.round(em.x),
@@ -613,30 +759,30 @@ setInterval(() => {
       color: em.color
     }));
 
-    const visiblePlayers = {};
-    for (let pid in reducedPlayers) {
-      const rp = reducedPlayers[pid];
-      const isVisible = rp.cells.some(c =>
-        Math.abs(c.x - viewX) < viewDist + 500 &&
-        Math.abs(c.y - viewY) < viewDist + 500
+    const jugadoresVisible = {};
+    for (let pid in jugadoresReducidos) {
+      const rp = jugadoresReducidos[pid];
+      const esVisible = rp.cells.some(c =>
+        Math.abs(c.x - vistaX) < distanciaVista + 500 &&
+        Math.abs(c.y - vistaY) < distanciaVista + 500
       );
 
-      if (isVisible) {
-        visiblePlayers[pid] = rp;
+      if (esVisible) {
+        jugadoresVisible[pid] = rp;
       }
     }
 
     socket.emit('stateUpdate', {
-      players: visiblePlayers,
-      food: visibleFood,
-      ejectedMass: visibleEjected,
-      viruses: visibleViruses,
-      leaderboard: leaderboard.slice(0, 10)
+      players: jugadoresVisible,
+      food: comidaVisible,
+      ejectedMass: masaEyaculadaVisible,
+      viruses: virusVisible,
+      leaderboard: clasificacion.slice(0, 10)
     });
   }
 
-}, 1000 / TICK_RATE);
+}, 1000 / TASA_ACTUALIZACION);
 
-server.listen(PORT, () => {
-  console.log(`🚀 Servidor corriendo en http://localhost:${PORT}`);
+servidor.listen(PUERTO, () => {
+  console.log(`🚀 Servidor corriendo en http://localhost:${PUERTO}`);
 });

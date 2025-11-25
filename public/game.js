@@ -1,546 +1,648 @@
 const socket = io();
 
-// DOM Elements
-const loginScreen = document.getElementById('login-screen');
-const gameOverScreen = document.getElementById('game-over-screen');
-const nicknameInput = document.getElementById('nickname');
-const colorInput = document.getElementById('color-picker');
-const skinSelector = document.getElementById('skin-selector');
-const customSkinInput = document.getElementById('custom-skin-input');
-const previewContainer = document.getElementById('preview-container');
-const skinPreview = document.getElementById('skin-preview');
-const myIdSpan = document.getElementById('my-id');
+// Elementos del DOM
+const pantallaInicioSesion = document.getElementById('login-screen');
+const pantallaFinJuego = document.getElementById('game-over-screen');
+const entradaApodo = document.getElementById('nickname');
+const entradaColor = document.getElementById('color-picker');
+const selectorAspecto = document.getElementById('skin-selector');
+const entradaAspectoPersonalizado = document.getElementById('custom-skin-input');
+const contenedorPrevisualizacion = document.getElementById('preview-container');
+const previsualizacionAspecto = document.getElementById('skin-preview');
+const miIdSpan = document.getElementById('my-id');
 
-// Game Over Elements
-const killerName = document.getElementById('killer-name');
-const deathMessage = document.getElementById('death-message');
-const killerSkinImg = document.getElementById('killer-skin-img');
-const killerColorCircle = document.getElementById('killer-color-circle');
-const statFinalMass = document.getElementById('stat-final-mass');
-const statRank = document.getElementById('stat-rank');
-const statFood = document.getElementById('stat-food');
-const statTime = document.getElementById('stat-time');
+// Elementos de Fin de Juego
+const nombreAsesino = document.getElementById('killer-name');
+const mensajeMuerte = document.getElementById('death-message');
+const imagenAspectoAsesino = document.getElementById('killer-skin-img');
+const circuloColorAsesino = document.getElementById('killer-color-circle');
+const estadisticaMasaFinal = document.getElementById('stat-final-mass');
+const estadisticaRango = document.getElementById('stat-rank');
+const estadisticaComida = document.getElementById('stat-food');
+const estadisticaTiempo = document.getElementById('stat-time');
 
-// Botones de Navegación (Game Over)
-const playBtn = document.getElementById('play-btn');
-const goSpectateBtn = document.getElementById('go-spectate-btn');
-const goMenuBtn = document.getElementById('go-menu-btn');
-const restartBtn = document.getElementById('restart-btn');
+// Botones de Navegación (Fin de Juego)
+const botonJugar = document.getElementById('play-btn');
+const botonIrEspectar = document.getElementById('go-spectate-btn');
+const botonIrMenu = document.getElementById('go-menu-btn');
+const botonReiniciar = document.getElementById('restart-btn');
 
 // Controles de Espectador (Barra Inferior)
-const spectatorControls = document.getElementById('spectator-controls');
-const specDetailsBtn = document.getElementById('spec-details-btn');
-const specRestartBtn = document.getElementById('spec-restart-btn');
-const specMenuBtn = document.getElementById('spec-menu-btn');
+const controlesEspectador = document.getElementById('spectator-controls');
+const botonDetallesEspectador = document.getElementById('spec-details-btn');
+const botonReiniciarEspectador = document.getElementById('spec-restart-btn');
+const botonMenuEspectador = document.getElementById('spec-menu-btn');
 
-const leaderboardDiv = document.getElementById('leaderboard');
-const leaderboardList = document.getElementById('leaderboard-list');
-const canvas = document.getElementById('game-canvas');
-const ctx = canvas.getContext('2d');
+const divClasificacion = document.getElementById('leaderboard');
+const listaClasificacion = document.getElementById('leaderboard-list');
+const lienzo = document.getElementById('game-canvas');
+const ctx = lienzo.getContext('2d');
 
+const pantallaSalaEspera = document.getElementById('lobby-screen');
+const divContadorJugadores = document.getElementById('player-count');
 
-const lobbyScreen = document.getElementById('lobby-screen');
-const playerCountDiv = document.getElementById('player-count');
+const listaJugadoresSalaEspera = document.getElementById('lobby-player-list');
+const superposicionCuentaRegresiva = document.getElementById('countdown-overlay');
+const numeroCuentaRegresiva = document.getElementById('countdown-number');
 
-const lobbyPlayerList = document.getElementById('lobby-player-list');
-const countdownOverlay = document.getElementById('countdown-overlay');
-const countdownNumber = document.getElementById('countdown-number');
+const pantallaVictoria = document.getElementById('victory-screen');
+const textoNombreGanador = document.getElementById('winner-name');
+const listaClasificacionFinal = document.getElementById('final-leaderboard-list');
+const spanCuentaRegresivaReiniciar = document.getElementById('restart-countdown');
 
-const victoryScreen = document.getElementById('victory-screen');
-const winnerNameText = document.getElementById('winner-name');
-const finalLeaderboardList = document.getElementById('final-leaderboard-list');
-const restartCountdownSpan = document.getElementById('restart-countdown');
+// --- CONTROLES MÓVILES ---
+const controlesMoviles = document.getElementById('mobile-controls');
+const baseJoystick = document.getElementById('joystick-base');
+const palancaJoystick = document.getElementById('joystick-handle');
+const botonDividir = document.getElementById('btn-split');
+
+// Estado del Joystick
+let vectorActual = { x: 0, y: 0 };
+let estaJoystickActivo = false;
+let estaJuegoCorriendo = false;
+const esDispositivoTactil = () => 'ontouchstart' in window || navigator.maxTouchPoints > 0 || navigator.msMaxTouchPoints > 0;
+
 
 // --- PALETA DE COLORES NEÓN ---
-const neonColors = [
-    "#FF0055", // Neon Red/Pink
-    "#00FF55", // Neon Green
-    "#5500FF", // Neon Indigo
-    "#FFFF00", // Neon Yellow
-    "#00FFFF", // Cyan
-    "#FF00FF", // Magenta
-    "#FF5500", // Neon Orange
-    "#AA00FF", // Purple
-    "#00FF00", // Lime
-    "#0080FF"  // Azure
+const coloresNeon = [
+    "#FF0055",
+    "#00FF55",
+    "#5500FF",
+    "#FFFF00",
+    "#00FFFF",
+    "#FF00FF",
+    "#FF5500",
+    "#AA00FF",
+    "#00FF00",
+    "#0080FF"
 ];
 
-// Función para asignar un color aleatorio al iniciar
-function setRandomNeonColor() {
-    const randomColor = neonColors[Math.floor(Math.random() * neonColors.length)];
-    colorInput.value = randomColor;
+function establecerColorNeonAleatorio() {
+    const colorAleatorio = coloresNeon[Math.floor(Math.random() * coloresNeon.length)];
+    entradaColor.value = colorAleatorio;
 }
 
-// Ejecutamos esto apenas carga el script
-setRandomNeonColor();
+establecerColorNeonAleatorio();
 
-// Game State
-let myId = null;
-let players = {};
-let food = [];
-let ejectedMass = [];
-let viruses = [];
+// Estado del Juego
+let miId = null;
+let jugadores = {};
+let comida = [];
+let masaEyaculada = [];
+let virus = [];
 
-// Coordenadas del Mouse (Locales)
-let mouseX = 0;
-let mouseY = 0;
+// Coordenadas del Ratón (Locales)
+let ratonX = 0;
+let ratonY = 0;
 
-let myCustomSkinData = null;
-let viewZoom = 1;
+let misDatosAspectoPersonalizado = null;
+let zoomVista = 1;
 
-// Spectator Mode State
-let isSpectating = false;
-let spectateTargetId = null;
+// Estado del Modo Espectador
+let estaEspectando = false;
+let idObjetivoEspectador = null;
 
-// Skins Load
-const loadedSkins = {
+// Carga de Aspectos
+const aspectosCargados = {
     earth: new Image(), moon: new Image(), mars: new Image(), virus: new Image()
 };
-loadedSkins.earth.src = 'https://upload.wikimedia.org/wikipedia/commons/thumb/9/97/The_Earth_seen_from_Apollo_17.jpg/1024px-The_Earth_seen_from_Apollo_17.jpg';
-loadedSkins.moon.src = 'https://upload.wikimedia.org/wikipedia/commons/e/e1/FullMoon2010.jpg';
-loadedSkins.mars.src = 'https://upload.wikimedia.org/wikipedia/commons/0/02/OSIRIS_Mars_true_color.jpg';
-loadedSkins.virus.src = 'https://upload.wikimedia.org/wikipedia/commons/thumb/8/82/SARS-CoV-2_without_background.png/1009px-SARS-CoV-2_without_background.png';
-const customSkinCache = {};
+aspectosCargados.earth.src = 'https://upload.wikimedia.org/wikipedia/commons/thumb/9/97/The_Earth_seen_from_Apollo_17.jpg/1024px-The_Earth_seen_from_Apollo_17.jpg';
+aspectosCargados.moon.src = 'https://upload.wikimedia.org/wikipedia/commons/e/e1/FullMoon2010.jpg';
+aspectosCargados.mars.src = 'https://upload.wikimedia.org/wikipedia/commons/0/02/OSIRIS_Mars_true_color.jpg';
+aspectosCargados.virus.src = 'https://upload.wikimedia.org/wikipedia/commons/thumb/8/82/SARS-CoV-2_without_background.png/1009px-SARS-CoV-2_without_background.png';
+const cacheAspectoPersonalizado = {};
 
-// Canvas Resize
-canvas.width = window.innerWidth; canvas.height = window.innerHeight;
-window.addEventListener('resize', () => { canvas.width = window.innerWidth; canvas.height = window.innerHeight; });
-canvas.addEventListener('mousemove', (e) => {
-    mouseX = e.clientX;
-    mouseY = e.clientY;
+// Redimensionamiento del Lienzo
+lienzo.width = window.innerWidth; lienzo.height = window.innerHeight;
+window.addEventListener('resize', () => { lienzo.width = window.innerWidth; lienzo.height = window.innerHeight; });
+lienzo.addEventListener('mousemove', (e) => {
+    ratonX = e.clientX;
+    ratonY = e.clientY;
 });
 
-// Controls
+// Controles
 window.addEventListener('keydown', (e) => {
     if (e.code === 'Space') socket.emit('split');
     if (e.code === 'KeyW') socket.emit('eject');
-    // Atajo ESC lleva al menú si estás espectando
-    if (e.code === 'Escape' && isSpectating) {
-        goToMenu();
+    if (e.code === 'Escape' && estaEspectando) {
+        irAMenu();
     }
 });
 
-// Custom Skin Logic
-customSkinInput.addEventListener('change', (e) => {
-    const file = e.target.files[0];
-    if (!file) return;
-    const reader = new FileReader();
-    reader.onload = (event) => {
+// --- LÓGICA JOYSTICK COMPLETA ---
+function actualizarJoystick(e) {
+    e.preventDefault();
+    let clientX, clientY;
+    if (e.touches) {
+        if (!e.touches[0]) return;
+        clientX = e.touches[0].clientX;
+        clientY = e.touches[0].clientY;
+    } else {
+        clientX = e.clientX;
+        clientY = e.clientY;
+    }
+
+    const rect = baseJoystick.getBoundingClientRect();
+    const centerX = rect.left + rect.width / 2;
+    const centerY = rect.top + rect.height / 2;
+    const radioMaximo = rect.width / 2;
+
+    const dx = clientX - centerX;
+    const dy = clientY - centerY;
+    const distancia = Math.sqrt(dx * dx + dy * dy);
+
+    if (distancia > radioMaximo) {
+        const angulo = Math.atan2(dy, dx);
+        palancaJoystick.style.left = radioMaximo * Math.cos(angulo) + 'px';
+        palancaJoystick.style.top = radioMaximo * Math.sin(angulo) + 'px';
+        vectorActual.x = Math.cos(angulo);
+        vectorActual.y = Math.sin(angulo);
+    } else {
+        palancaJoystick.style.left = dx + 'px';
+        palancaJoystick.style.top = dy + 'px';
+        vectorActual.x = dx / radioMaximo;
+        vectorActual.y = dy / radioMaximo;
+    }
+}
+
+function detenerJoystick() {
+    if (!estaJoystickActivo) return;
+    estaJoystickActivo = false;
+    palancaJoystick.style.left = '50%';
+    palancaJoystick.style.top = '50%';
+    vectorActual = { x: 0, y: 0 };
+}
+
+if (esDispositivoTactil() && controlesMoviles) {
+    controlesMoviles.classList.remove('hidden');
+
+    baseJoystick.addEventListener('touchstart', (e) => {
+        estaJoystickActivo = true;
+        actualizarJoystick(e);
+    });
+    window.addEventListener('touchmove', (e) => {
+        if (estaJoystickActivo) actualizarJoystick(e);
+    });
+    window.addEventListener('touchend', detenerJoystick);
+
+    if (botonDividir) {
+        botonDividir.addEventListener('touchstart', (e) => {
+            e.preventDefault();
+            if (estaJuegoCorriendo && !estaEspectando) {
+                socket.emit('split');
+            }
+        });
+    }
+
+}
+
+
+// Lógica de Aspecto Personalizado
+entradaAspectoPersonalizado.addEventListener('change', (e) => {
+    const archivo = e.target.files[0];
+    if (!archivo) return;
+    const lector = new FileReader();
+    lector.onload = (evento) => {
         const img = new Image();
-        img.src = event.target.result;
+        img.src = evento.target.result;
         img.onload = () => {
-            const tempCanvas = document.createElement('canvas');
-            const tempCtx = tempCanvas.getContext('2d');
-            tempCanvas.width = 100; tempCanvas.height = 100;
-            tempCtx.drawImage(img, 0, 0, 100, 100);
-            myCustomSkinData = tempCanvas.toDataURL('image/jpeg', 0.8);
-            skinPreview.src = myCustomSkinData;
-            previewContainer.classList.remove('hidden');
-            skinSelector.value = "";
+            const lienzoTemporal = document.createElement('canvas');
+            const ctxTemporal = lienzoTemporal.getContext('2d');
+            lienzoTemporal.width = 100; lienzoTemporal.height = 100;
+            ctxTemporal.drawImage(img, 0, 0, 100, 100);
+            misDatosAspectoPersonalizado = lienzoTemporal.toDataURL('image/jpeg', 0.8);
+            previsualizacionAspecto.src = misDatosAspectoPersonalizado;
+            contenedorPrevisualizacion.classList.remove('hidden');
+            selectorAspecto.value = "";
         }
     };
-    reader.readAsDataURL(file);
+    lector.readAsDataURL(archivo);
 });
-skinSelector.addEventListener('change', () => {
-    if (skinSelector.value !== "") {
-        customSkinInput.value = ""; myCustomSkinData = null; previewContainer.classList.add('hidden');
+selectorAspecto.addEventListener('change', () => {
+    if (selectorAspecto.value !== "") {
+        entradaAspectoPersonalizado.value = ""; misDatosAspectoPersonalizado = null; contenedorPrevisualizacion.classList.add('hidden');
     }
 });
 
-// --- SOCKET EVENTS ---
-socket.on('playerInfo', (id) => { myId = id; myIdSpan.innerText = id; });
+// --- EVENTOS SOCKET ---
+socket.on('playerInfo', (id) => { miId = id; miIdSpan.innerText = id; });
 socket.on('serverFull', (msg) => { alert(msg); location.reload(); });
 
 // Actualización de la sala de espera
-// 1. EVENTO PRIVADO: Solo se ejecuta cuando YO entro a la sala
 socket.on('joinedLobby', () => {
-    loginScreen.classList.add('hidden');
-    gameOverScreen.classList.add('hidden');
-    spectatorControls.classList.add('hidden');
-    lobbyScreen.classList.remove('hidden');
+    pantallaInicioSesion.classList.add('hidden');
+    pantallaFinJuego.classList.add('hidden');
+    controlesEspectador.classList.add('hidden');
+    pantallaSalaEspera.classList.remove('hidden');
+    if (controlesMoviles) controlesMoviles.classList.add('hidden');
 });
 
-// 2. EVENTO PÚBLICO: Se ejecuta para TODOS (actualiza la lista)
+let ultimaListaNombresJSON = "";
+
 socket.on('lobbyUpdate', (data) => {
-    // NOTA: Ya NO ocultamos/mostramos pantallas aquí. 
-    // Solo actualizamos los datos visuales.
+    if (!data.timerActive) {
+        divContadorJugadores.innerText = `${data.count} / ${data.required} para iniciar`;
+        divContadorJugadores.style.color = "#4CAF50";
+        const textoInfo = document.querySelector('.lobby-info p');
+        if (textoInfo) textoInfo.innerText = "Esperando jugadores...";
+    } else {
+        divContadorJugadores.innerText = `INICIO EN: ${data.timeLeft}s`;
+        divContadorJugadores.style.color = "#FF5722";
+        const textoInfo = document.querySelector('.lobby-info p');
+        if (textoInfo) textoInfo.innerText = "¡La partida va a comenzar!";
+    }
 
-    // Actualizar contador
-    playerCountDiv.innerText = `${data.count} / ${data.required}`;
+    const currentNamesJSON = JSON.stringify(data.names);
 
-    // Actualizar lista de nombres
-    lobbyPlayerList.innerHTML = '';
-    data.names.forEach((name, index) => {
-        const li = document.createElement('li');
-        li.innerText = `${index + 1}. ${name}`;
-        lobbyPlayerList.appendChild(li);
-    });
+    if (currentNamesJSON !== ultimaListaNombresJSON) {
+        listaJugadoresSalaEspera.innerHTML = '';
+        data.names.forEach((name, index) => {
+            const li = document.createElement('li');
+            li.innerText = `${index + 1}. ${name}`;
+            listaJugadoresSalaEspera.appendChild(li);
+        });
+
+        ultimaListaNombresJSON = currentNamesJSON;
+    }
 });
 
 // El juego ha comenzado
 socket.on('gameStarted', () => {
-    lobbyScreen.classList.add('hidden');
-    loginScreen.classList.add('hidden');
-    countdownOverlay.classList.add('hidden');
-    leaderboardDiv.classList.remove('hidden');
+    estaJuegoCorriendo = true;
+    pantallaSalaEspera.classList.add('hidden');
+    pantallaInicioSesion.classList.add('hidden');
+    superposicionCuentaRegresiva.classList.add('hidden');
+    divClasificacion.classList.remove('hidden');
+    if (esDispositivoTactil() && controlesMoviles) controlesMoviles.classList.remove('hidden');
 
-    if (!inputInterval) startInputLoop();
+    if (!intervaloEntrada) iniciarBucleEntrada();
 });
 
 socket.on('stateUpdate', (data) => {
-    food = data.food;
-    ejectedMass = data.ejectedMass || [];
-    viruses = data.viruses || [];
-    updateLeaderboard(data.leaderboard);
+    comida = data.food;
+    masaEyaculada = data.ejectedMass || [];
+    virus = data.viruses || [];
+    actualizarClasificacion(data.leaderboard);
 
-    if (isSpectating && spectateTargetId && !data.players[spectateTargetId]) {
+    if (estaEspectando && idObjetivoEspectador && !data.players[idObjetivoEspectador]) {
         if (data.leaderboard && data.leaderboard.length > 0) {
-            spectateTargetId = data.leaderboard[0].id;
+            idObjetivoEspectador = data.leaderboard[0].id;
         }
     }
 
-    const backendPlayers = data.players;
-    for (const id in backendPlayers) {
-        const bPlayer = backendPlayers[id];
-        if (!players[id]) { players[id] = bPlayer; }
+    const jugadoresBackend = data.players;
+    for (const id in jugadoresBackend) {
+        const bPlayer = jugadoresBackend[id];
+        if (!jugadores[id]) { jugadores[id] = bPlayer; }
         else {
-            players[id].nickname = bPlayer.nickname;
-            players[id].color = bPlayer.color;
-            players[id].skin = bPlayer.skin;
-            players[id].customSkin = bPlayer.customSkin;
-            const currentCellsMap = {};
-            players[id].cells.forEach(c => currentCellsMap[c.id] = c);
-            players[id].cells = bPlayer.cells.map(bCell => {
-                const existingCell = currentCellsMap[bCell.id];
-                if (existingCell) {
-                    existingCell.targetX = bCell.x; existingCell.targetY = bCell.y; existingCell.targetRadius = bCell.radius;
-                    return existingCell;
+            jugadores[id].nickname = bPlayer.nickname;
+            jugadores[id].color = bPlayer.color;
+            jugadores[id].skin = bPlayer.skin;
+            jugadores[id].customSkin = bPlayer.customSkin;
+            const mapaCelulasActuales = {};
+            jugadores[id].cells.forEach(c => mapaCelulasActuales[c.id] = c);
+            jugadores[id].cells = bPlayer.cells.map(bCell => {
+                const celulaExistente = mapaCelulasActuales[bCell.id];
+                if (celulaExistente) {
+                    celulaExistente.targetX = bCell.x; celulaExistente.targetY = bCell.y; celulaExistente.targetRadius = bCell.radius;
+                    return celulaExistente;
                 } else {
                     return { id: bCell.id, x: bCell.x, y: bCell.y, radius: bCell.radius, targetX: bCell.x, targetY: bCell.y, targetRadius: bCell.radius };
                 }
             });
         }
     }
-    for (const id in players) { if (!backendPlayers[id]) delete players[id]; }
+    for (const id in jugadores) { if (!jugadoresBackend[id]) delete jugadores[id]; }
 });
 
-// --- GAME OVER HANDLER ---
+// --- MANEJADOR DE FIN DE JUEGO ---
 socket.on('gameOver', (data) => {
-    killerName.innerText = data.killerName;
-    deathMessage.innerText = data.message;
+    estaJuegoCorriendo = false;
+    nombreAsesino.innerText = data.killerName;
+    mensajeMuerte.innerText = data.message;
 
     if (data.killerCustomSkin) {
-        killerSkinImg.src = data.killerCustomSkin;
-        killerSkinImg.classList.remove('hidden');
-        killerColorCircle.classList.add('hidden');
-    } else if (data.killerSkin && loadedSkins[data.killerSkin]) {
-        killerSkinImg.src = loadedSkins[data.killerSkin].src;
-        killerSkinImg.classList.remove('hidden');
-        killerColorCircle.classList.add('hidden');
+        imagenAspectoAsesino.src = data.killerCustomSkin;
+        imagenAspectoAsesino.classList.remove('hidden');
+        circuloColorAsesino.classList.add('hidden');
+    } else if (data.killerSkin && aspectosCargados[data.killerSkin]) {
+        imagenAspectoAsesino.src = aspectosCargados[data.killerSkin].src;
+        imagenAspectoAsesino.classList.remove('hidden');
+        circuloColorAsesino.classList.add('hidden');
     } else {
-        killerSkinImg.classList.add('hidden');
-        killerColorCircle.classList.remove('hidden');
-        killerColorCircle.style.backgroundColor = data.killerColor;
+        imagenAspectoAsesino.classList.add('hidden');
+        circuloColorAsesino.classList.remove('hidden');
+        circuloColorAsesino.style.backgroundColor = data.killerColor;
     }
 
-    statFinalMass.innerText = data.stats.finalMass;
-    statRank.innerText = data.stats.bestRank === 999 ? "-" : "#" + data.stats.bestRank;
-    statFood.innerText = data.stats.cellsEaten;
+    estadisticaMasaFinal.innerText = data.stats.finalMass;
+    estadisticaRango.innerText = data.stats.bestRank === 999 ? "-" : "#" + data.stats.bestRank;
+    estadisticaComida.innerText = data.stats.cellsEaten;
 
-    const secondsAlive = Math.floor(data.stats.timeAlive / 1000);
-    const m = Math.floor(secondsAlive / 60);
-    const s = secondsAlive % 60;
-    statTime.innerText = `${m}m ${s}s`;
+    const segundosVivo = Math.floor(data.stats.timeAlive / 1000);
+    const m = Math.floor(segundosVivo / 60);
+    const s = segundosVivo % 60;
+    estadisticaTiempo.innerText = `${m}m ${s}s`;
 
-    spectateTargetId = data.killerId;
+    idObjetivoEspectador = data.killerId;
 
-    gameOverScreen.classList.remove('hidden');
-    leaderboardDiv.classList.add('hidden');
-    spectatorControls.classList.add('hidden');
+    pantallaFinJuego.classList.remove('hidden');
+    divClasificacion.classList.add('hidden');
+    controlesEspectador.classList.add('hidden');
+    if (controlesMoviles) controlesMoviles.classList.add('hidden');
 });
 
 socket.on('startCountdown', (seconds) => {
-    // Ocultar lobby, mostrar cuenta regresiva
-    lobbyScreen.classList.add('hidden');
-    countdownOverlay.classList.remove('hidden');
+    pantallaSalaEspera.classList.add('hidden');
+    superposicionCuentaRegresiva.classList.remove('hidden');
 
-    let counter = seconds;
-    countdownNumber.innerText = counter;
+    let contador = seconds;
+    numeroCuentaRegresiva.innerText = contador;
 
-    const interval = setInterval(() => {
-        counter--;
-        if (counter > 0) {
-            countdownNumber.innerText = counter;
+    const intervalo = setInterval(() => {
+        contador--;
+        if (contador > 0) {
+            numeroCuentaRegresiva.innerText = contador;
         } else {
-            // Cuando llega a 0, limpiamos (el evento gameStarted se encargará de quitar el overlay)
-            clearInterval(interval);
+            clearInterval(intervalo);
         }
     }, 1000);
 });
 
 
 socket.on('roundWon', (data) => {
-    // 1. Ocultar HUD del juego
-    leaderboardDiv.classList.add('hidden');
+    estaJuegoCorriendo = false;
+    divClasificacion.classList.add('hidden');
+    controlesEspectador.classList.add('hidden');
+    if (controlesMoviles) controlesMoviles.classList.add('hidden');
 
-    // 2. Llenar datos de victoria
-    winnerNameText.innerText = data.winnerName;
+    textoNombreGanador.innerText = data.winnerName;
 
-    // Llenar el Top 10 final
-    finalLeaderboardList.innerHTML = '';
+    listaClasificacionFinal.innerHTML = '';
     data.leaderboard.forEach((player, index) => {
         const li = document.createElement('li');
-        li.innerHTML = `<span>#${index + 1} ${player.name}</span> <span>${player.score}</span>`;
-        finalLeaderboardList.appendChild(li);
+
+        if (player.id === miId) {
+            li.classList.add('highlight-self');
+        }
+
+        li.innerHTML = `
+            <span style="color: ${player.id === miId ? '#fff' : player.color}; text-shadow: 0 0 2px black;">
+                #${index + 1} ${player.name}
+            </span> 
+            <span>${player.score}</span>
+        `;
+        listaClasificacionFinal.appendChild(li);
     });
 
-    // 3. Mostrar pantalla
-    victoryScreen.classList.remove('hidden');
+    pantallaVictoria.classList.remove('hidden');
 
-    // 4. Cuenta regresiva visual de 10s
-    let timeLeft = 10;
-    restartCountdownSpan.innerText = timeLeft;
-    const timer = setInterval(() => {
-        timeLeft--;
-        if (timeLeft >= 0) restartCountdownSpan.innerText = timeLeft;
-        else clearInterval(timer);
+    let tiempoRestante = 10;
+    spanCuentaRegresivaReiniciar.innerText = tiempoRestante;
+    const temporizador = setInterval(() => {
+        tiempoRestante--;
+        if (tiempoRestante >= 0) spanCuentaRegresivaReiniciar.innerText = tiempoRestante;
+        else clearInterval(temporizador);
     }, 1000);
 });
 
 socket.on('serverReset', () => {
-    // Recargar la página es la forma más limpia de resetear todo el estado local
-    // O llamar a goToMenu() y limpiar variables manualmente.
-    // Dado que pediste "volver a poner nombre", location.reload() es lo más seguro y fácil.
     location.reload();
 });
 
 // --- LÓGICA DE BOTONES Y NAVEGACIÓN ---
 
-playBtn.addEventListener('click', joinGame);
+botonJugar.addEventListener('click', unirseAlJuego);
 
-// 1. Acciones desde GAME OVER
-restartBtn.addEventListener('click', () => {
-    gameOverScreen.classList.add('hidden');
-    spectatorControls.classList.add('hidden');
-    isSpectating = false;
-    joinGame();
+botonReiniciar.addEventListener('click', () => {
+    pantallaFinJuego.classList.add('hidden');
+    controlesEspectador.classList.add('hidden');
+    if (esDispositivoTactil() && controlesMoviles) controlesMoviles.classList.remove('hidden');
+    estaEspectando = false;
+    unirseAlJuego();
 });
 
-goMenuBtn.addEventListener('click', goToMenu);
+botonIrMenu.addEventListener('click', irAMenu);
 
-goSpectateBtn.addEventListener('click', () => {
-    gameOverScreen.classList.add('hidden');
-    leaderboardDiv.classList.remove('hidden');
-    spectatorControls.classList.remove('hidden');
-    isSpectating = true;
+botonIrEspectar.addEventListener('click', () => {
+    pantallaFinJuego.classList.add('hidden');
+    divClasificacion.classList.remove('hidden');
+    controlesEspectador.classList.remove('hidden');
+    if (controlesMoviles) controlesMoviles.classList.add('hidden');
+    estaEspectando = true;
 });
 
-// 2. Acciones desde MODO ESPECTADOR
-specDetailsBtn.addEventListener('click', () => {
-    spectatorControls.classList.add('hidden');
-    leaderboardDiv.classList.add('hidden');
-    gameOverScreen.classList.remove('hidden');
+botonDetallesEspectador.addEventListener('click', () => {
+    controlesEspectador.classList.add('hidden');
+    divClasificacion.classList.add('hidden');
+    pantallaFinJuego.classList.remove('hidden');
 });
 
-specRestartBtn.addEventListener('click', () => {
-    spectatorControls.classList.add('hidden');
-    gameOverScreen.classList.add('hidden');
-    isSpectating = false;
-    joinGame();
+botonReiniciarEspectador.addEventListener('click', () => {
+    controlesEspectador.classList.add('hidden');
+    pantallaFinJuego.classList.add('hidden');
+    if (esDispositivoTactil() && controlesMoviles) controlesMoviles.classList.remove('hidden');
+    estaEspectando = false;
+    unirseAlJuego();
 });
 
-specMenuBtn.addEventListener('click', goToMenu);
+botonMenuEspectador.addEventListener('click', irAMenu);
 
-// Función auxiliar para ir al menú
-function goToMenu() {
-    gameOverScreen.classList.add('hidden');
-    spectatorControls.classList.add('hidden');
-    leaderboardDiv.classList.add('hidden');
-    loginScreen.classList.remove('hidden');
-    isSpectating = false;
-    spectateTargetId = null;
+function irAMenu() {
+    estaJuegoCorriendo = false;
+    pantallaFinJuego.classList.add('hidden');
+    controlesEspectador.classList.add('hidden');
+    divClasificacion.classList.add('hidden');
+    pantallaInicioSesion.classList.remove('hidden');
+    if (controlesMoviles) controlesMoviles.classList.add('hidden');
+    estaEspectando = false;
+    idObjetivoEspectador = null;
 }
 
-function joinGame() {
-    const name = nicknameInput.value.trim() || ''; // .trim() quita espacios
+function unirseAlJuego() {
+    const nombre = entradaApodo.value.trim() || '';
 
-    // REQUISITO: Nombre obligatorio
-    if (name.length === 0) {
+    if (nombre.length === 0) {
         alert("¡Debes ponerte un nombre para jugar!");
         return;
     }
 
-    const color = colorInput.value;
-    const skin = skinSelector.value;
+    const color = entradaColor.value;
+    const aspecto = selectorAspecto.value;
 
-    // Enviamos la petición, pero NO ocultamos el login todavía manualmente.
-    // Esperaremos a que el servidor nos diga que entramos a la sala.
-    socket.emit('startGame', { nickname: name, color: color, skin: skin, customSkin: myCustomSkinData });
+    socket.emit('startGame', { nickname: nombre, color: color, skin: aspecto, customSkin: misDatosAspectoPersonalizado });
 
 }
 
-function updateLeaderboard(topPlayers) {
-    leaderboardList.innerHTML = '';
+function actualizarClasificacion(topPlayers) {
+    listaClasificacion.innerHTML = '';
     if (!topPlayers) return;
     topPlayers.forEach((player, index) => {
         const li = document.createElement('li');
 
-        // Creamos el HTML con el estilo de color
-        // Usamos text-shadow para que se lea bien si el color es muy oscuro
         li.innerHTML = `
             <span style="color: ${player.color}; text-shadow: 0 0 2px black; font-weight: bold;">
                 #${index + 1} ${player.name}
             </span> 
             <span>${player.score}</span>
         `;
-        leaderboardList.appendChild(li);
+        listaClasificacion.appendChild(li);
     });
 }
 
-let inputInterval = null;
-function startInputLoop() {
-    if (inputInterval) clearInterval(inputInterval);
-    inputInterval = setInterval(() => {
-        if (!isSpectating && myId && players[myId] && players[myId].cells.length > 0) {
-            let centerX = 0, centerY = 0;
-            players[myId].cells.forEach(c => { centerX += c.x; centerY += c.y; });
-            centerX /= players[myId].cells.length; centerY /= players[myId].cells.length;
-            const vectorX = mouseX - canvas.width / 2; const vectorY = mouseY - canvas.height / 2;
-            socket.emit('input', { x: centerX + vectorX, y: centerY + vectorY });
+let intervaloEntrada = null;
+function iniciarBucleEntrada() {
+    if (intervaloEntrada) clearInterval(intervaloEntrada);
+    intervaloEntrada = setInterval(() => {
+        if (!estaEspectando && miId && jugadores[miId] && jugadores[miId].cells.length > 0) {
+            let centroX = 0, centroY = 0;
+            jugadores[miId].cells.forEach(c => { centroX += c.x; centroY += c.y; });
+            centroX /= jugadores[miId].cells.length; centroY /= jugadores[miId].cells.length;
+
+            let objetivoX, objetivoY;
+            if (esDispositivoTactil() && (estaJoystickActivo || (vectorActual.x !== 0 || vectorActual.y !== 0))) {
+                const escalaMovimiento = 1500;
+                objetivoX = centroX + vectorActual.x * escalaMovimiento;
+                objetivoY = centroY + vectorActual.y * escalaMovimiento;
+            } else {
+                const vectorX = ratonX - lienzo.width / 2;
+                const vectorY = ratonY - lienzo.height / 2;
+                objetivoX = centroX + vectorX;
+                objetivoY = centroY + vectorY;
+            }
+
+            socket.emit('input', { x: objetivoX, y: objetivoY });
         }
     }, 1000 / 60);
 }
 
-function lerp(start, end, t) { return start + (end - start) * t; }
+function interpolacionLineal(inicio, fin, t) { return inicio + (fin - inicio) * t; }
 
-function drawVirus(ctx, x, y, radius) {
+function dibujarVirus(ctx, x, y, radius) {
     ctx.fillStyle = '#33FF33'; ctx.strokeStyle = '#22AA22'; ctx.lineWidth = 5;
-    const numSpikes = 20; const spikeHeight = 5;
+    const numPicos = 20; const alturaPico = 5;
     ctx.beginPath();
-    for (let i = 0; i < numSpikes * 2; i++) {
-        const angle = (Math.PI * 2 * i) / (numSpikes * 2);
-        const r = (i % 2 === 0) ? radius + spikeHeight : radius - spikeHeight;
-        const vx = x + Math.cos(angle) * r; const vy = y + Math.sin(angle) * r;
+    for (let i = 0; i < numPicos * 2; i++) {
+        const angulo = (Math.PI * 2 * i) / (numPicos * 2);
+        const r = (i % 2 === 0) ? radius + alturaPico : radius - alturaPico;
+        const vx = x + Math.cos(angulo) * r; const vy = y + Math.sin(angulo) * r;
         if (i === 0) ctx.moveTo(vx, vy); else ctx.lineTo(vx, vy);
     }
     ctx.closePath(); ctx.fill(); ctx.stroke();
 }
 
-function traceJellyPath(ctx, radius) {
-    const resolution = Math.max(20, Math.min(120, Math.floor(radius * 1.5)));
-    const time = Date.now() / 200;
+function trazarRutaGelatina(ctx, radius) {
+    const resolucion = Math.max(20, Math.min(120, Math.floor(radius * 1.5)));
+    const tiempo = Date.now() / 200;
     ctx.beginPath();
-    for (let i = 0; i <= resolution; i++) {
-        const angle = (Math.PI * 2 * i) / resolution;
-        const offset = Math.sin(angle * 5 + time) * Math.cos(angle * 3 - time);
-        const wobbleAmount = radius * 0.03;
-        const r = radius + (offset * wobbleAmount);
-        const x = Math.cos(angle) * r; const y = Math.sin(angle) * r;
+    for (let i = 0; i <= resolucion; i++) {
+        const angulo = (Math.PI * 2 * i) / resolucion;
+        const desplazamiento = Math.sin(angulo * 5 + tiempo) * Math.cos(angulo * 3 - tiempo);
+        const cantidadOscilacion = radius * 0.03;
+        const r = radius + (desplazamiento * cantidadOscilacion);
+        const x = Math.cos(angulo) * r; const y = Math.sin(angulo) * r;
         if (i === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
     }
     ctx.closePath();
 }
 
-function drawGrid() {
+function dibujarCuadricula() {
     ctx.beginPath(); ctx.strokeStyle = 'rgba(255, 255, 255, 0.1)'; ctx.lineWidth = 1;
     for (let x = 0; x <= 3000; x += 50) { ctx.moveTo(x, 0); ctx.lineTo(x, 3000); }
     for (let y = 0; y <= 3000; y += 50) { ctx.moveTo(0, y); ctx.lineTo(3000, y); }
     ctx.stroke(); ctx.closePath();
 }
 
-function draw() {
-    requestAnimationFrame(draw);
-    ctx.fillStyle = '#0b0b0b'; ctx.fillRect(0, 0, canvas.width, canvas.height);
+function dibujar() {
+    requestAnimationFrame(dibujar);
+    ctx.fillStyle = '#0b0b0b'; ctx.fillRect(0, 0, lienzo.width, lienzo.height);
 
-    let camX = 0, camY = 0;
-    let totalMassForZoom = 0;
-    let targetFound = false;
+    let camaraX = 0, camaraY = 0;
+    let masaTotalParaZoom = 0;
+    let objetivoEncontrado = false;
 
-    if (!isSpectating && myId && players[myId] && players[myId].cells.length > 0) {
-        const p = players[myId];
-        p.cells.forEach(c => { camX += c.x; camY += c.y; totalMassForZoom += c.mass; });
-        camX /= p.cells.length; camY /= p.cells.length;
-        targetFound = true;
+    if (!estaEspectando && miId && jugadores[miId] && jugadores[miId].cells.length > 0) {
+        const p = jugadores[miId];
+        p.cells.forEach(c => { camaraX += c.x; camaraY += c.y; masaTotalParaZoom += c.mass; });
+        camaraX /= p.cells.length; camaraY /= p.cells.length;
+        objetivoEncontrado = true;
     }
-    else if (isSpectating && spectateTargetId && players[spectateTargetId]) {
-        const p = players[spectateTargetId];
+    else if (estaEspectando && idObjetivoEspectador && jugadores[idObjetivoEspectador]) {
+        const p = jugadores[idObjetivoEspectador];
         if (p.cells.length > 0) {
-            p.cells.forEach(c => { camX += c.x; camY += c.y; totalMassForZoom += c.mass; });
-            camX /= p.cells.length; camY /= p.cells.length;
-            targetFound = true;
+            p.cells.forEach(c => { camaraX += c.x; camaraY += c.y; masaTotalParaZoom += c.mass; });
+            camaraX /= p.cells.length; camaraY /= p.cells.length;
+            objetivoEncontrado = true;
         }
     }
 
-    if (!targetFound) {
-        camX = 1500; camY = 1500; totalMassForZoom = 100;
+    if (!objetivoEncontrado) {
+        camaraX = 1500; camaraY = 1500; masaTotalParaZoom = 100;
     }
 
-    // --- MEJORA DE CÁMARA ---
-    let massZoom = 50 / (Math.sqrt(totalMassForZoom) + 40);
-    const baseWidth = 1920;
-    const baseHeight = 1080;
-    let screenFactor = Math.max(canvas.width / baseWidth, canvas.height / baseHeight);
-    let targetZoom = massZoom * screenFactor;
-    const minZoom = 0.1 * screenFactor;
-    const maxZoom = 1.5 * screenFactor;
-    targetZoom = Math.max(minZoom, Math.min(maxZoom, targetZoom));
+    let zoomMasa = 50 / (Math.sqrt(masaTotalParaZoom) + 40);
+    const anchoBase = 1920;
+    const altoBase = 1080;
+    let factorPantalla = Math.max(lienzo.width / anchoBase, lienzo.height / altoBase);
+    let zoomObjetivo = zoomMasa * factorPantalla;
+    const zoomMinimo = 0.1 * factorPantalla;
+    const zoomMaximo = 1.5 * factorPantalla;
+    zoomObjetivo = Math.max(zoomMinimo, Math.min(zoomMaximo, zoomObjetivo));
 
-    viewZoom = lerp(viewZoom, targetZoom, 0.05);
+    zoomVista = interpolacionLineal(zoomVista, zoomObjetivo, 0.05);
 
-    for (const id in players) {
-        const p = players[id];
+    for (const id in jugadores) {
+        const p = jugadores[id];
         p.cells.forEach(cell => {
             if (cell.targetX !== undefined) {
-                cell.x = lerp(cell.x, cell.targetX, 0.1);
-                cell.y = lerp(cell.y, cell.targetY, 0.1);
-                cell.radius = lerp(cell.radius, cell.targetRadius, 0.1);
+                cell.x = interpolacionLineal(cell.x, cell.targetX, 0.1);
+                cell.y = interpolacionLineal(cell.y, cell.targetY, 0.1);
+                cell.radius = interpolacionLineal(cell.radius, cell.targetRadius, 0.1);
             }
         });
     }
 
     ctx.save();
-    ctx.translate(canvas.width / 2, canvas.height / 2);
-    ctx.scale(viewZoom, viewZoom);
-    ctx.translate(-camX, -camY);
+    ctx.translate(lienzo.width / 2, lienzo.height / 2);
+    ctx.scale(zoomVista, zoomVista);
+    ctx.translate(-camaraX, -camaraY);
 
     ctx.save(); ctx.beginPath(); ctx.rect(0, 0, 3000, 3000); ctx.clip();
-    drawGrid();
+    dibujarCuadricula();
     ctx.strokeStyle = '#333'; ctx.lineWidth = 5; ctx.strokeRect(0, 0, 3000, 3000);
 
-    food.forEach(f => { ctx.beginPath(); ctx.arc(f.x, f.y, 5, 0, Math.PI * 2); ctx.fillStyle = f.color; ctx.fill(); });
-    ejectedMass.forEach(em => { ctx.beginPath(); ctx.arc(em.x, em.y, em.radius, 0, Math.PI * 2); ctx.fillStyle = em.color; ctx.fill(); ctx.strokeStyle = 'black'; ctx.lineWidth = 1; ctx.stroke(); });
+    comida.forEach(f => { ctx.beginPath(); ctx.arc(f.x, f.y, 5, 0, Math.PI * 2); ctx.fillStyle = f.color; ctx.fill(); });
+    masaEyaculada.forEach(em => { ctx.beginPath(); ctx.arc(em.x, em.y, em.radius, 0, Math.PI * 2); ctx.fillStyle = em.color; ctx.fill(); ctx.strokeStyle = 'black'; ctx.lineWidth = 1; ctx.stroke(); });
 
-    let allCellsToDraw = [];
-    for (const id in players) {
-        const p = players[id];
-        p.cells.forEach(c => { allCellsToDraw.push({ ...c, nickname: p.nickname, color: p.color, skin: p.skin, customSkin: p.customSkin, parentId: p.id }); });
+    let todasCelulasADibujar = [];
+    for (const id in jugadores) {
+        const p = jugadores[id];
+        p.cells.forEach(c => { todasCelulasADibujar.push({ ...c, nickname: p.nickname, color: p.color, skin: p.skin, customSkin: p.customSkin, parentId: p.id }); });
     }
-    allCellsToDraw.sort((a, b) => a.radius - b.radius);
+    todasCelulasADibujar.sort((a, b) => a.radius - b.radius);
 
-    allCellsToDraw.forEach(cell => {
+    todasCelulasADibujar.forEach(cell => {
         ctx.save(); ctx.translate(cell.x, cell.y);
-        traceJellyPath(ctx, cell.radius);
-        let imageToDraw = null;
+        trazarRutaGelatina(ctx, cell.radius);
+        let imagenADibujar = null;
         if (cell.customSkin) {
-            if (!customSkinCache[cell.parentId]) { const img = new Image(); img.src = cell.customSkin; customSkinCache[cell.parentId] = img; }
-            if (customSkinCache[cell.parentId].complete) imageToDraw = customSkinCache[cell.parentId];
-        } else if (cell.skin && loadedSkins[cell.skin] && loadedSkins[cell.skin].complete) { imageToDraw = loadedSkins[cell.skin]; }
+            if (!cacheAspectoPersonalizado[cell.parentId]) { const img = new Image(); img.src = cell.customSkin; cacheAspectoPersonalizado[cell.parentId] = img; }
+            if (cacheAspectoPersonalizado[cell.parentId].complete) imagenADibujar = cacheAspectoPersonalizado[cell.parentId];
+        } else if (cell.skin && aspectosCargados[cell.skin] && aspectosCargados[cell.skin].complete) { imagenADibujar = aspectosCargados[cell.skin]; }
 
-        if (imageToDraw) { ctx.save(); ctx.clip(); ctx.drawImage(imageToDraw, -cell.radius, -cell.radius, cell.radius * 2, cell.radius * 2); ctx.restore(); }
+        if (imagenADibujar) { ctx.save(); ctx.clip(); ctx.drawImage(imagenADibujar, -cell.radius, -cell.radius, cell.radius * 2, cell.radius * 2); ctx.restore(); }
         else { ctx.fillStyle = cell.color; ctx.fill(); }
 
-        const borderWidth = Math.max(2, cell.radius * 0.05);
-        ctx.strokeStyle = '#fff'; ctx.lineWidth = borderWidth; ctx.stroke();
+        const anchoBorde = Math.max(2, cell.radius * 0.05);
+        ctx.strokeStyle = '#fff'; ctx.lineWidth = anchoBorde; ctx.stroke();
 
-        ctx.lineWidth = borderWidth * 2;
+        ctx.lineWidth = anchoBorde * 2;
         if (cell.x < cell.radius) { const h = Math.sqrt(Math.abs(cell.radius ** 2 - cell.x ** 2)); ctx.beginPath(); ctx.moveTo(-cell.x, -h); ctx.lineTo(-cell.x, h); ctx.stroke(); }
         if (cell.x > 3000 - cell.radius) { const d = 3000 - cell.x; const h = Math.sqrt(Math.abs(cell.radius ** 2 - d ** 2)); ctx.beginPath(); ctx.moveTo(d, -h); ctx.lineTo(d, h); ctx.stroke(); }
         if (cell.y < cell.radius) { const w = Math.sqrt(Math.abs(cell.radius ** 2 - cell.y ** 2)); ctx.beginPath(); ctx.moveTo(-w, -cell.y); ctx.lineTo(w, -cell.y); ctx.stroke(); }
         if (cell.y > 3000 - cell.radius) { const d = 3000 - cell.y; const w = Math.sqrt(Math.abs(cell.radius ** 2 - d ** 2)); ctx.beginPath(); ctx.moveTo(-w, d); ctx.lineTo(w, d); ctx.stroke(); }
 
-        // --- CAMBIO AQUÍ: NOMBRE MÁS GRANDE ---
         if (cell.radius > 5) {
-            // Aumenté el tamaño base de 10 a 16 y el multiplicador de 0.3 a 0.5
             ctx.fillStyle = 'white'; ctx.font = `bold ${Math.max(16, cell.radius * 0.5)}px Arial`;
             ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.strokeStyle = 'black'; ctx.lineWidth = 2;
             ctx.strokeText(cell.nickname, 0, 0); ctx.fillText(cell.nickname, 0, 0);
@@ -549,7 +651,7 @@ function draw() {
     });
     ctx.restore();
 
-    ctx.save(); viruses.forEach(v => drawVirus(ctx, v.x, v.y, v.radius)); ctx.restore();
+    ctx.save(); virus.forEach(v => dibujarVirus(ctx, v.x, v.y, v.radius)); ctx.restore();
     ctx.restore();
 }
-draw();
+dibujar();

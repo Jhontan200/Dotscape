@@ -4,141 +4,145 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-  <title>Agar Clone</title>
+  <title>DOTSCAPE</title>
   <link rel="stylesheet" href="style.css">
 </head>
 
 <body>
-  <div id="lobby-screen" class="hidden">
-    <h1>Sala de Espera</h1>
-    <div class="lobby-info">
-      <p>Esperando jugadores...</p>
-      <div id="player-count">0 / 10</div>
+  <section>
+    <div id="lobby-screen" class="hidden">
+      <h1>Sala de Espera</h1>
+      <div class="lobby-info">
+        <p>Esperando jugadores...</p>
+        <div id="player-count">0 / 10</div>
 
-      <ul id="lobby-player-list"></ul>
+        <ul id="lobby-player-list"></ul>
 
-      <div class="loader"></div>
-    </div>
-  </div>
-
-  <div id="countdown-overlay" class="hidden">
-    <div id="countdown-number">3</div>
-  </div>
-  <div id="victory-screen" class="hidden">
-    <div class="trophy-icon">🏆</div>
-    <h1 id="winner-name">NOMBRE DEL GANADOR</h1>
-    <h2 class="winner-label">HA GANADO LA RONDA</h2>
-
-    <div class="final-leaderboard-container">
-      <h3>Top 10 Final</h3>
-      <ul id="final-leaderboard-list">
-      </ul>
-    </div>
-
-    <div class="restart-timer">Nueva ronda en <span id="restart-countdown">10</span>s</div>
-  </div>
-
-  <div id="login-screen">
-    <h1>Agar Clone</h1>
-    <div class="player-id">ID: <span id="my-id">...</span></div>
-
-    <input type="text" id="nickname" placeholder="Tu Nickname" maxlength="10" autocomplete="off">
-
-    <div class="row-container">
-      <div class="col">
-        <label>Color</label>
-        <input type="color" id="color-picker" value="#ff0000">
-      </div>
-      <div class="col wide">
-        <label>Skin</label>
-        <select id="skin-selector">
-          <option value="">Ninguna</option>
-          <option value="earth">Tierra 🌍</option>
-          <option value="moon">Luna 🌑</option>
-          <option value="mars">Marte 🪐</option>
-          <option value="virus">Virus 🦠</option>
-        </select>
+        <div class="loader"></div>
       </div>
     </div>
 
-    <div class="divider"><span>O SUBE TU IMAGEN</span></div>
+    <div id="countdown-overlay" class="hidden">
+      <div id="countdown-number">3</div>
+    </div>
+    <div id="victory-screen" class="hidden">
+      <div class="trophy-icon">🏆</div>
+      <h1 id="winner-name">NOMBRE DEL GANADOR</h1>
+      <h2 class="winner-label">HA GANADO LA RONDA</h2>
 
-    <label for="custom-skin-input" class="custom-file-upload">
-      📁 Seleccionar Imagen
-    </label>
-    <input type="file" id="custom-skin-input" accept="image/*">
-    <div id="file-name-display">Ningún archivo seleccionado</div>
+      <div class="final-leaderboard-container">
+        <h3>Top 10 Final</h3>
+        <ul id="final-leaderboard-list">
+        </ul>
+      </div>
 
-    <div id="preview-container" class="hidden">
-      <img id="skin-preview" src="">
+      <div class="restart-timer">Nueva ronda en <span id="restart-countdown">10</span>s</div>
     </div>
 
-    <button id="play-btn">JUGAR</button>
-  </div>
+    <div id="login-screen">
+      <h1>DOTSCAPE</h1>
+      <div class="player-id">ID: <span id="my-id">...</span></div>
 
-  <div id="game-over-screen" class="hidden">
-    <h2>¡ELIMINADO!</h2>
+      <input type="text" id="nickname" placeholder="Tu Nickname" maxlength="10" autocomplete="off">
 
-    <div class="killer-info">
-      <div class="killer-img-container">
-        <img id="killer-skin-img" src="" class="hidden">
-        <div id="killer-color-circle"></div>
+      <div class="row-container">
+        <div class="col">
+          <label>Color</label>
+          <input type="color" id="color-picker" value="#ff0000">
+        </div>
+        <div class="col wide">
+          <label>Skin</label>
+          <select id="skin-selector">
+            <option value="">Ninguna</option>
+            <option value="earth">Tierra 🌍</option>
+            <option value="moon">Luna 🌑</option>
+            <option value="mars">Marte 🪐</option>
+            <option value="virus">Virus 🦠</option>
+          </select>
+        </div>
       </div>
-      <div class="killer-text">
-        <h3 id="killer-name">Nombre</h3>
-        <p id="death-message">te ha comido</p>
+
+      <div class="divider"><span>O SUBE TU IMAGEN</span></div>
+
+      <label for="custom-skin-input" class="custom-file-upload">
+        📁 Seleccionar Imagen
+      </label>
+      <input type="file" id="custom-skin-input" accept="image/*">
+      <div id="file-name-display">Ningún archivo seleccionado</div>
+
+      <div id="preview-container" class="hidden">
+        <img id="skin-preview" src="">
       </div>
+
+      <button id="play-btn">JUGAR</button>
     </div>
 
-    <div class="stats-grid">
-      <div class="stat-box">
-        <span class="stat-label">Masa Final</span>
-        <span class="stat-value" id="stat-final-mass">0</span>
+    <div id="game-over-screen" class="hidden">
+      <h2>¡ELIMINADO!</h2>
+
+      <div class="killer-info">
+        <div class="killer-img-container">
+          <img id="killer-skin-img" src="" class="hidden">
+          <div id="killer-color-circle"></div>
+        </div>
+        <div class="killer-text">
+          <h3 id="killer-name">Nombre</h3>
+          <p id="death-message">te ha comido</p>
+        </div>
       </div>
-      <div class="stat-box">
-        <span class="stat-label">Ranking</span>
-        <span class="stat-value" id="stat-rank">#0</span>
+
+      <div class="stats-grid">
+        <div class="stat-box">
+          <span class="stat-label">Masa Final</span>
+          <span class="stat-value" id="stat-final-mass">0</span>
+        </div>
+        <div class="stat-box">
+          <span class="stat-label">Ranking</span>
+          <span class="stat-value" id="stat-rank">#0</span>
+        </div>
+        <div class="stat-box">
+          <span class="stat-label">Comida</span>
+          <span class="stat-value" id="stat-food">0</span>
+        </div>
+        <div class="stat-box">
+          <span class="stat-label">Tiempo</span>
+          <span class="stat-value" id="stat-time">0s</span>
+        </div>
       </div>
-      <div class="stat-box">
-        <span class="stat-label">Comida</span>
-        <span class="stat-value" id="stat-food">0</span>
+
+      <div class="action-buttons-container">
+        <button id="go-spectate-btn" class="secondary-btn">Espectar</button>
+        <button id="go-menu-btn" class="secondary-btn">Menú</button>
       </div>
-      <div class="stat-box">
-        <span class="stat-label">Tiempo</span>
-        <span class="stat-value" id="stat-time">0s</span>
-      </div>
+      <button id="restart-btn" class="primary-btn">REINICIAR</button>
     </div>
 
-    <div class="action-buttons-container">
-      <button id="go-spectate-btn" class="secondary-btn">Espectar</button>
-      <button id="go-menu-btn" class="secondary-btn">Menú</button>
+    <div id="leaderboard" class="hidden">
+      <h3>TOP 10</h3>
+      <ul id="leaderboard-list"></ul>
     </div>
-    <button id="restart-btn" class="primary-btn">REINICIAR</button>
-  </div>
 
-  <div id="leaderboard" class="hidden">
-    <h3>TOP 10</h3>
-    <ul id="leaderboard-list"></ul>
-  </div>
+    <div id="spectator-controls" class="hidden">
+      <button id="spec-details-btn" class="spec-btn">Ver Muerte</button>
+      <button id="spec-restart-btn" class="spec-btn highlight">Reiniciar</button>
+      <button id="spec-menu-btn" class="spec-btn">Menú</button>
+    </div>
 
-  <div id="spectator-controls" class="hidden">
-    <button id="spec-details-btn" class="spec-btn">Ver Muerte</button>
-    <button id="spec-restart-btn" class="spec-btn highlight">Reiniciar</button>
-    <button id="spec-menu-btn" class="spec-btn">Menú</button>
-  </div>
+    <canvas id="game-canvas"></canvas>
 
-  <canvas id="game-canvas"></canvas>
+    <div id="mobile-controls" class="hidden">
+      <div id="joystick-base">
+        <div id="joystick-handle"></div>
+      </div>
+      <div id="mobile-action-buttons">
+        <button id="btn-split" class="mobile-btn">DIVIDIR</button>
+      </div>
+    </div>
+  </section>
 
   <script src="/socket.io/socket.io.js"></script>
   <script src="game.js"></script>
-
-  <script>
-    document.getElementById('custom-skin-input').addEventListener('change', function () {
-      var fileName = this.files[0] ? this.files[0].name : "Ningún archivo seleccionado";
-      if (fileName.length > 20) fileName = fileName.substring(0, 17) + "...";
-      document.getElementById('file-name-display').textContent = fileName;
-    });
-  </script>
+  <script src="skin.js"></script>
 </body>
 
 </html>
