@@ -111,6 +111,11 @@ for (let i = 0; i < MAX_COMIDA; i++) comida.push(crearComida());
 for (let i = 0; i < MAX_VIRUS; i++) virus.push(crearVirus());
 
 app.use(express.static('public'));
+// ← AÑADE ESTO
+app.get('/', (req, res) => {
+  res.sendFile(__dirname + '/public/index.html');
+});
+// ← HASTA AQUÍ
 
 // --- FUNCIÓN: LÓGICA DE EXPULSIÓN REUTILIZABLE ---
 /**
